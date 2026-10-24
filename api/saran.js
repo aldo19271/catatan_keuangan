@@ -108,7 +108,7 @@ module.exports = async function handler(req, res) {
     });
 
     if (r.status === 429) {
-      return res.status(429).json({ error: 'Kuota Gemini gratis sedang habis. Coba lagi nanti.' });
+      return res.status(429).json({ error: 'Kuota AI gratis sedang habis. Coba lagi nanti.' });
     }
     if (!r.ok) {
       console.error('Gemini error status', r.status);
