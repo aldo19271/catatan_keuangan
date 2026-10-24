@@ -202,7 +202,7 @@ async function render() {
   $('totIn').textContent = rupiah(days.reduce((a, d) => a + d.inc, 0));
   const sameMonth = dates[0].getMonth() === dates[6].getMonth();
   const startLabel = sameMonth ? String(dates[0].getDate()) : fmtMini(dates[0]);
-  $('weekLabel').textContent = `${startLabel} – ${fmtMini(dates[6])} ${dates[6].getFullYear()}` + (state.offset === 0 ? ' · minggu ini' : '');
+  $('weekLabel').textContent = `${startLabel} - ${fmtMini(dates[6])} ${dates[6].getFullYear()}` + (state.offset === 0 ? ' · minggu ini' : '');
   $('nextWeek').disabled = state.offset >= 0;
 
   const t = todayKey();
