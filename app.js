@@ -231,9 +231,9 @@ function drawDetail(key, txs, adv) {
   const inc = txs.filter((x) => x.type === 'in').reduce((a, x) => a + x.amount, 0);
 
   let hint = '';
-  if (!isPast) hint = 'Beri Saran tersedia setelah hari ini berlalu.';
-  else if (!hasData) hint = 'Tidak ada catatan di hari ini untuk dianalisis.';
-  const canAdvise = isPast && hasData;
+  if (!isPast && !isToday) hint = 'Hari ini belum tiba, belum bisa dianalisis.';
+  else if (!hasData) hint = isToday ? 'Catat dulu pengeluaran atau penghasilan agar bisa dianalisis.' : 'Tidak ada catatan di hari ini untuk dianalisis.';
+  const canAdvise = (isPast || isToday) && hasData;
   const label = canAdvise && adv ? 'Lihat Saran' : 'Beri Saran';
 
   const list = hasData
@@ -410,7 +410,7 @@ async function fetchSaran(date, txs) {
   return data.saran;
 }
 async function openAdvice(key) {
-  if (key >= todayKey()) return;
+  if (key > todayKey()) return;
   saranKey = key;
   $('saranTitle').textContent = 'Saran · ' + fmtLong(key);
   showSaran('loading'); // bersihkan isi lama agar tidak muncul sekilas
