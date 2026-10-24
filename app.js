@@ -385,7 +385,7 @@ function renderAdvice(container, text) {
 function showSaran(kind, text) {
   const body = $('saranBody');
   if (kind === 'loading') {
-    body.replaceChildren(h('div', { class: 'spin' }), h('p', { class: 'center', text: 'Gemini sedang menganalisis catatanmu…' }));
+    body.replaceChildren(h('div', { class: 'spin' }), h('p', { class: 'center', text: 'AI sedang menganalisis catatanmu…' }));
   } else if (kind === 'ok') {
     renderAdvice(body, text);
   } else {
@@ -405,7 +405,7 @@ async function fetchSaran(date, txs) {
   }
   let data = {};
   try { data = await res.json(); } catch (e) { /* abaikan */ }
-  if (res.status === 429) throw new Error(data.error || 'Terlalu banyak permintaan atau kuota Gemini habis. Coba lagi nanti.');
+  if (res.status === 429) throw new Error(data.error || 'Terlalu banyak permintaan atau kuota AI habis. Coba lagi nanti.');
   if (!res.ok || !data.saran) throw new Error(data.error || 'Gagal mendapatkan saran. Coba lagi nanti.');
   return data.saran;
 }
