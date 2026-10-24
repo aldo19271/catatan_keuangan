@@ -105,7 +105,7 @@ vercel.json  package.json
 ## Developer
 
 <p>
-  Dibuat oleh <a href="https://instagram.com/apap09_"><b>apap09_</b></a>.<br>
+  Dibuat oleh <b>Al_</b>.<br>
   Instagram: <a href="https://instagram.com/apap09_">@apap09_</a>
 </p>
 
