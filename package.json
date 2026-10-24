@@ -1,0 +1,6 @@
+{
+  "name": "catatan-keuangan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PWA pencatat pengeluaran dan penghasilan dengan saran dari Gemini"
+}
