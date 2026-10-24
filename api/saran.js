@@ -117,12 +117,12 @@ module.exports = async function handler(req, res) {
     const data = await r.json();
     const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
     const text = Array.isArray(parts) ? parts.map((p) => p.text || '').join('').trim() : '';
-    if (!text) return res.status(502).json({ error: 'Gemini tidak memberi jawaban (mungkin diblokir filter). Coba lagi.' });
+    if (!text) return res.status(502).json({ error: 'AI tidak memberi jawaban (mungkin diblokir filter). Coba lagi.' });
     return res.status(200).json({ saran: text.slice(0, 4000) });
   } catch (e) {
     const timeout = e && e.name === 'AbortError';
     console.error('Gemini request failed:', timeout ? 'timeout' : e && e.message);
-    return res.status(504).json({ error: timeout ? 'Gemini terlalu lama merespons. Coba lagi.' : 'Gagal menghubungi Gemini.' });
+    return res.status(504).json({ error: timeout ? 'AI terlalu lama merespons. Coba lagi.' : 'Gagal menghubungi AI.' });
   } finally {
     clearTimeout(timer);
   }
