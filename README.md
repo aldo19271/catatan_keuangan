@@ -1,3 +1,5 @@
+## MOBILE SUPPORT ONLY
+
 <p align="center">
   <img src="docs/readme/banner.png" alt="Cal: catat uang harianmu, dapat saran dari AI" width="100%">
 </p>
