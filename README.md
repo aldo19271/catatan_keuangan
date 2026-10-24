@@ -29,7 +29,6 @@
 | **Grafik satu minggu** | Garis merah untuk pengeluaran, garis hijau untuk penghasilan, lengkap dengan total mingguan. |
 | **Kalender Senin–Minggu** | Mengikuti tanggal di HP. Setelah lewat tengah malam hari Minggu, tabel otomatis pindah ke minggu baru dan kembali ke Senin. |
 | **Beri Saran** | Ketuk sebuah hari, lalu minta AI menunjukkan letak kesalahan, hal yang perlu diperbaiki, dan hal yang perlu ditingkatkan. |
-| **Hanya untuk hari yang sudah lewat** | Beri Saran pucat dan tidak bisa ditekan pada hari ini dan hari yang belum tiba, supaya analisisnya berdasarkan catatan yang sudah lengkap. |
 | **Ubah dan hapus catatan** | Ketuk catatan untuk mengubah, ✕ untuk menghapus. Saran lama otomatis dibuang bila catatan hari itu berubah. |
 | **Data tetap di HP** | Disimpan di IndexedDB. Ada **Ekspor/Impor JSON** untuk backup dan pindah HP. |
 | **Jalan offline** | Dipasang ke layar utama seperti aplikasi biasa. Hanya Beri Saran yang butuh internet. |
