@@ -112,7 +112,7 @@ module.exports = async function handler(req, res) {
     }
     if (!r.ok) {
       console.error('Gemini error status', r.status);
-      return res.status(502).json({ error: 'Layanan Gemini sedang bermasalah. Coba lagi nanti.' });
+      return res.status(502).json({ error: 'Layanan sedang bermasalah. Coba lagi!.' });
     }
     const data = await r.json();
     const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
