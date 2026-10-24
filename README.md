@@ -31,7 +31,7 @@
 | **Beri Saran** | Ketuk sebuah hari, lalu minta AI menunjukkan letak kesalahan, hal yang perlu diperbaiki, dan hal yang perlu ditingkatkan. |
 | **Ubah dan hapus catatan** | Ketuk catatan untuk mengubah, ✕ untuk menghapus. Saran lama otomatis dibuang bila catatan hari itu berubah. |
 | **Data tetap di HP** | Disimpan di IndexedDB. Ada **Ekspor/Impor JSON** untuk backup dan pindah HP. |
-| **Jalan offline** | Dipasang ke layar utama seperti aplikasi biasa. Hanya Beri Saran yang butuh internet. |
+| **Jalan offline** | Dipasang ke layar utama seperti aplikasi biasa. Hanya Fitur "Beri Saran" yang butuh internet. |
 
 <p align="center">
   <img src="docs/readme/tour.png" alt="Tiga layar Cal: beranda dengan grafik dan kalender, form catatan, dan hasil Beri Saran" width="100%">
@@ -58,7 +58,7 @@ Cal hanya butuh GitHub dan Vercel, tanpa build command.
    | Nama | Isi |
    |---|---|
    | `GEMINI_API_KEY` | API key dari [Google AI Studio](https://aistudio.google.com/) |
-   | `GEMINI_MODEL` | *(opsional)* default `gemini-2.5-flash` |
+   | `GEMINI_MODEL` | *(opsional)* default `gemini-3.5-flash-lite` |
 
 4. **Redeploy** agar variabel terbaca.
 5. Ganti link GitHub di halaman Developer: buka `index.html`, cari komentar `GANTI link repo`, lalu ubah `href` di bawahnya ke repo-mu.
