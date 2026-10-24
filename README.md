@@ -100,7 +100,7 @@ vercel.json  package.json
 
 - **Saran AI:** [Google Gemini](https://ai.google.dev/).
 - **Hosting:** [Vercel](https://vercel.com).
-- **Live Website:** [Open](https://vercel.com).
+- **Live Website:** [Open](https://catatankeuangan-orpin.vercel.app/).
 - **Font:** font sistem perangkat, tanpa unduhan tambahan.
 
 ## Developer
