@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="PWA" src="https://img.shields.io/badge/PWA-bisa_dipasang-000?style=for-the-badge&logo=pwa&logoColor=white">
   <img alt="Tema gelap" src="https://img.shields.io/badge/tema-gelap_oranye-000?style=for-the-badge&labelColor=1c1c1e&color=ff7a1a">
-  <img alt="Gemini" src="https://img.shields.io/badge/saran_AI-Gemini-000?style=for-the-badge&logo=googlegemini&logoColor=white">
+  <img alt="Gemini" src="https://img.shields.io/badge/Model_AI-Gemini-000?style=for-the-badge&logo=googlegemini&logoColor=white">
   <img alt="Vercel" src="https://img.shields.io/badge/deploy-Vercel-000?style=for-the-badge&logo=vercel&logoColor=white">
   <a href="https://instagram.com/apap09_"><img alt="Instagram" src="https://img.shields.io/badge/instagram-apap09__-000?style=for-the-badge&logo=instagram&logoColor=white"></a>
 </p>
