@@ -38,14 +38,12 @@
 </p>
 <p align="center"><sub>Tampilan asli aplikasi dengan data contoh. Isi saran AI di gambar hanyalah contoh.</sub></p>
 
-## Pakai Cal
+## Cara Pakai
 
 1. Buka link Cal di browser HP.
 2. Menu browser → **Tambahkan ke layar utama** (Chrome Android) atau **Bagikan → Tambah ke Layar Utama** (Safari iPhone).
 3. Tekan **+** di tengah bawah untuk mencatat. Tekan sebuah hari di kalender untuk melihat rinciannya.
 4. Besoknya, tekan hari kemarin lalu **Beri Saran**.
-
-Info developer ada di tombol **Developer** di pojok kanan bawah. Backup dan hapus data ada di ikon gerigi.
 
 ## Deploy sendiri
 
