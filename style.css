@@ -24,7 +24,7 @@ h1,h2,p{margin:0}
 .brand{display:flex;align-items:center;gap:10px}
 .logo{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:1.2rem;
   color:#1a0d02;background:linear-gradient(135deg,var(--or),var(--or2));box-shadow:0 4px 14px rgba(255,122,26,.3)}
-.wordmark{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;position:relative}
+.wordmark{font-size:1.35rem;font-weight:800;letter-spacing:-.02em}
 .icon-btn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
   color:var(--mu);font-size:1.4rem;line-height:1}
 .icon-btn:active{background:var(--s2)}
