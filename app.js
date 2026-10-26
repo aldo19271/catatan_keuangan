@@ -466,7 +466,7 @@ function openAdd() {
   editing = null;
   const t = todayKey();
   addDate = state.selected <= t ? state.selected : t;
-  $('formTitle').textContent = addDate === t ? 'Catatan' : 'Catatan · ' + fmtLong(addDate);
+  $('formTitle').textContent = addDate === t ? 'Buat Catatan' : 'Buat Catatan • ' + fmtLong(addDate);
   $('form').classList.remove('editing');
   Object.values(TYPES).forEach((c) => { $(c.radio).disabled = false; });
   resetForm();
