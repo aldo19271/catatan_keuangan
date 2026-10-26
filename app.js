@@ -365,7 +365,7 @@ function drawDetail(key, txs, adv, rise = true) {
   if (!isPast && !isToday) hint = 'Hari ini belum tiba, belum bisa dianalisis.';
   else if (!hasData) hint = isToday ? 'Catat dulu pengeluaran atau penghasilan agar bisa dianalisis.' : 'Tidak ada catatan di hari ini untuk dianalisis.';
   const canAdvise = (isPast || isToday) && hasData;
-  const label = canAdvise && adv ? 'Lihat Saran' : 'Beri Saran';
+  const label = canAdvise && adv ? 'Lihat Saran' : 'Minta Saran AI';
 
   const list = hasData
     ? h('ul', { class: 'txs' }, txs.map((x) => h('li', { class: `tx ${x.type}` },
