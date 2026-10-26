@@ -17,7 +17,7 @@
   <a href="https://instagram.com/apap09_"><img alt="Instagram" src="https://img.shields.io/badge/instagram-apap09__-000?style=for-the-badge&logo=instagram&logoColor=white"></a>
 </p>
 
-> **Cal adalah proyek pribadi** yang dibuat untuk dipakai sendiri dan teman-teman. Datanya disimpan di HP masing-masing, dan saran AI memakai API key Gemini gratis. Dukungan bersifat sebisanya (best-effort).
+> **Cal adalah proyek pribadi** yang dibuat untuk dipakai sendiri. Datanya disimpan di HP masing-masing, dan saran AI memakai API key Gemini gratis. Dukungan bersifat sebisanya (best-effort).
 
 <br>
 
