@@ -90,9 +90,8 @@ vercel.json  package.json
 ## Privasi dan data
 
 - Catatan **tidak disimpan di server**. Semuanya ada di browser HP masing-masing, dan tiap pengguna datanya terpisah.
-- Saat **Beri Saran**, nominal dan deskripsi catatan **satu hari itu** dikirim ke Gemini lewat server. Pada paket gratis, Google dapat memakai data tersebut untuk pengembangan produk. Hindari menulis data sensitif di deskripsi.
+- Saat **Minta Saran AI**, nominal dan deskripsi catatan **satu hari itu** dikirim ke Gemini lewat server. Pada paket gratis, Google dapat memakai data tersebut untuk pengembangan produk. Hindari menulis data sensitif di deskripsi.
 - Data hilang bila data situs/cache browser dihapus atau ganti HP. **Ekspor JSON secara berkala.**
-- Cal tidak memakai login atau kode akses. Siapa pun yang tahu link bisa memakai Beri Saran dan memakai kuota Gemini gratis pemilik. Server membatasi 6 permintaan per menit per IP sebagai pengaman ringan.
 - Satu browser = satu data. Membuka link yang sama di browser lain akan tampil kosong.
 
 ## Kredit
