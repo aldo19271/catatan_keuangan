@@ -28,7 +28,7 @@
 | **Catat dalam hitungan detik** | Tekan **+**, pilih **Pengeluaran** atau **Penghasilan**, isi nominal dan deskripsi (opsional) untuk masing-masing, lalu **Confirm**. Keduanya bisa diisi sekaligus, dan deskripsinya tidak saling tercampur. Nominal otomatis berformat rupiah. |
 | **Analisis Tahun / Bulan / Minggu** | Garis merah untuk pengeluaran, garis hijau untuk penghasilan. Ganti periodenya lewat tombol di bawah grafik: **Minggu** (7 hari), **Bulan** (tiap tanggal), atau **Tahun** (12 bulan), lengkap dengan total periode dan tombol ‹ › untuk melihat periode sebelumnya. Ketuk grafik untuk membuka hari atau bulan itu. |
 | **Kalender Senin–Minggu** | Mengikuti tanggal di HP. Setelah lewat tengah malam hari Minggu, tabel otomatis pindah ke minggu baru dan kembali ke Senin. |
-| **Beri Saran** | Ketuk sebuah hari, lalu minta AI menunjukkan letak kesalahan, hal yang perlu diperbaiki, dan hal yang perlu ditingkatkan. |
+| **Minta Saran AI** | Ketuk sebuah hari, lalu minta AI menunjukkan letak kesalahan, hal yang perlu diperbaiki, dan hal yang perlu ditingkatkan. |
 | **Ubah dan hapus catatan** | Ketuk catatan untuk mengubah, ✕ untuk menghapus. Saran lama otomatis dibuang bila catatan hari itu berubah. |
 | **Data tetap di HP** | Disimpan di IndexedDB. Ada **Ekspor/Impor JSON** untuk backup dan pindah HP. |
 | **Jalan offline** | Dipasang ke layar utama seperti aplikasi biasa. Hanya Fitur "Beri Saran" yang butuh internet. |
@@ -45,11 +45,9 @@
 3. Tekan **+** di tengah bawah untuk mencatat, lalu pilih Pengeluaran atau Penghasilan. Tekan sebuah hari di kalender untuk melihat rinciannya, atau pakai tombol **Tahun / Bulan / Minggu** di bawah grafik untuk mengganti periode analisis.
 4. Besoknya, tekan hari kemarin lalu **Beri Saran**.
 
-Info developer ada di tombol **Developer** di pojok kanan bawah. Backup dan hapus data ada di ikon gerigi.
-
 ## Deploy sendiri
 
-Cal hanya butuh GitHub dan Vercel, tanpa build command.
+hanya butuh GitHub dan Vercel, tanpa build command.
 
 1. Unggah semua file proyek ke repository GitHub (folder `api/`, `icons/`, dan `docs/` ikut).
 2. Di Vercel: **Add New → Project** → pilih repository → **Deploy**. Framework Preset: *Other*.
