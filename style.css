@@ -157,6 +157,7 @@ textarea,.plain{width:100%;background:var(--s2);border:1px solid var(--line);bor
 .row .plain{flex:1}
 .err{color:var(--red);font-size:.82rem;min-height:1.1em;margin-top:10px}
 .note{color:var(--mu);font-size:.78rem;line-height:1.45;margin-top:6px}
+.versi{color:var(--mu);font-size:.50rem;line-height:1.45;margin-top:6px}
 .actions{display:flex;justify-content:flex-end;margin-top:8px}
 .btn-primary{padding:13px 30px;border-radius:14px;font-weight:700;color:#1a0d02;
   background:linear-gradient(135deg,var(--or),var(--or2))}
