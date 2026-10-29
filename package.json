@@ -1,9 +1,0 @@
-{
-  "name": "catatan-keuangan",
-  "version": "1.0.0",
-  "private": true,
-  "description": "PWA pencatat pengeluaran dan penghasilan dengan akun, database Neon, dan saran dari Gemini",
-  "dependencies": {
-    "@neondatabase/serverless": "^0.10.4 || ^1.0.0"
-  }
-}
