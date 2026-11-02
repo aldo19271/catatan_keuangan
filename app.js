@@ -97,7 +97,7 @@ async function dbImport(txs, advices) {
 // mode: 'week' | 'month' | 'year' (periode grafik analisis). offset = minggu pada kalender, pOffset = bulan/tahun pada grafik.
 const state = { user: null, mode: 'week', offset: 0, pOffset: 0, selected: todayKey(), lastToday: todayKey(), seq: 0, dir: 0, pending: new Set() };
 const MODE_ORDER = { year: 0, month: 1, week: 2 };
-const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion = () => false;
 const EASE = 'cubic-bezier(.2,.8,.2,1)';
 let editing = null;
 let saranKey = null;
