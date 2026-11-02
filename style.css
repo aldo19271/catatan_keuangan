@@ -209,8 +209,6 @@ textarea,.plain{width:100%;background:var(--s2);border:1px solid var(--line);bor
 @keyframes sp{to{transform:rotate(360deg)}}
 .center{text-align:center;color:var(--mu)}
 
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
 /* ===== Layar awal (landing, login, daftar, loading) ===== */
 /* Konsep: halaman buku kas. Garis tulis, dua garis margin, dan grafik dua garis yang "ditulis" saat layar muncul. */
 body.gated #app,body.gated .bar{visibility:hidden}
@@ -417,4 +415,3 @@ html,*{scrollbar-width:none;-ms-overflow-style:none}
 .dlg.open .dlg-act .dlg-yes{animation-delay:.46s}
 @keyframes dlgKey{from{transform:translateY(16px) scale(.92)}}
 .dlg-act button:focus-visible{outline:2px solid var(--or);outline-offset:3px}
-@media (prefers-reduced-motion:reduce){.dlg *{animation:none!important}.dlg-ic path{stroke-dashoffset:0}}
