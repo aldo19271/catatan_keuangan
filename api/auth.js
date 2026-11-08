@@ -26,7 +26,7 @@ const MAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_LIST = 500;
 
 function fail(res, code, msg) { return res.status(code).json({ error: msg }); }
-const userOut = (r) => ({ username: r.username, email: r.email, isAdmin: A.isTrue(r.is_admin) });
+const userOut = (r) => ({ ...(r.id != null ? { id: Number(r.id) } : {}), username: r.username, email: r.email, isAdmin: A.isTrue(r.is_admin) });
 
 // validasi bidang akun; kembalikan pesan kesalahan atau null
 function checkFields(f) {
@@ -92,7 +92,7 @@ module.exports = async function handler(req, res) {
       const sess = await A.getSession(req);
       if (!sess) return fail(res, 401, 'Belum masuk.');
       await A.renewIfOld(req, res, sess);
-      return res.status(200).json({ user: { username: sess.username, email: sess.email, isAdmin: sess.isAdmin } });
+      return res.status(200).json({ user: { id: sess.id, username: sess.username, email: sess.email, isAdmin: sess.isAdmin } });
     }
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'GET, POST');
@@ -132,7 +132,7 @@ module.exports = async function handler(req, res) {
         throw e;
       }
       await A.createSession(req, res, Number(rows[0].id));
-      return res.status(200).json({ user: { username, email, isAdmin: false } });
+      return res.status(200).json({ user: { id: Number(rows[0].id), username, email, isAdmin: false } });
     }
 
     if (action === 'login') {

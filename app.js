@@ -69,20 +69,131 @@ async function api(path, body) {
     res = await fetch(path, body === undefined ? { cache: 'no-store' } : {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store',
     });
-  } catch (e) { throw new Error('Tidak ada koneksi ke server. Periksa internet lalu coba lagi.'); }
+  } catch (e) { setNet(false); const er = new Error('Tidak ada koneksi ke server. Periksa internet lalu coba lagi.'); er.offline = true; throw er; }
+  setNet(true);
   let data = {};
   try { data = await res.json(); } catch (e) { /* respons bukan JSON */ }
   if (res.status === 401 && (!path.startsWith('/api/auth') || state.user)) { onSessionLost(); throw new Error('Sesi berakhir. Silakan masuk lagi.'); }
-  if (!res.ok) { const er = new Error(data.error || 'Terjadi kesalahan di server (' + res.status + ').'); er.data = data; throw er; }
+  if (!res.ok) { const er = new Error(data.error || 'Terjadi kesalahan di server (' + res.status + ').'); er.data = data; er.status = res.status; throw er; }
   return data;
 }
-const dbRange = (from, to) => api(`/api/data?from=${from}&to=${to}`).then((d) => d.items);
-const dbGetAdvice = (date) => api(`/api/data?advice=${date}`).then((d) => d.advice);
+/* --- Offline: cache catatan + antrean sinkron (IndexedDB). Hanya catatan harian. --- */
+let netOn = true, qCount = 0, flushing = false;
+function setNet(on) { if (netOn !== on) { netOn = on; paintChip(); if (on) flushQueue(); } }
+function paintChip() {
+  const c = $('netChip'); if (!c) return;
+  const txt = flushing ? 'Menyinkronkan…' : !netOn ? (qCount ? `Offline · ${qCount} belum tersinkron` : 'Offline') : qCount ? `${qCount} belum tersinkron` : '';
+  c.textContent = txt; c.hidden = !txt || !state.user;
+}
+const OFF = { db: null };
+function offDb() {
+  if (!OFF.db) OFF.db = new Promise((ok, no) => {
+    const r = indexedDB.open('cal-offline', 1);
+    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('tx', { keyPath: 'id' }); d.createObjectStore('adv', { keyPath: 'date' }); d.createObjectStore('q', { autoIncrement: true }); d.createObjectStore('meta'); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+  });
+  return OFF.db;
+}
+// jalankan beberapa operasi dalam satu transaksi; fn menerima fungsi st(nama)
+async function offTx(names, mode, fn) {
+  const d = await offDb();
+  return new Promise((ok, no) => {
+    const tr = d.transaction(names, mode); let out;
+    tr.oncomplete = () => ok(out); tr.onerror = tr.onabort = () => no(tr.error);
+    const pr = (rq) => new Promise((o, n) => { rq.onsuccess = () => o(rq.result); rq.onerror = () => n(rq.error); });
+    Promise.resolve(fn((n) => tr.objectStore(n), pr)).then((v) => { out = v; }, no);
+  });
+}
+const offSafe = (p) => p.catch(() => undefined); // cache gagal tidak boleh merusak alur online
+const byOrder = (x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : (x.createdAt || 0) - (y.createdAt || 0) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+const strip = (i) => ({ id: i.id, date: i.date, type: i.type, amount: i.amount, desc: i.desc, createdAt: i.createdAt });
+async function offAll() { return offTx(['tx'], 'readonly', (st, pr) => pr(st('tx').getAll())); }
+async function offCacheRange(from, to, items) {
+  await offTx(['tx'], 'readwrite', async (st, pr) => {
+    const have = await pr(st('tx').getAll());
+    const keep = new Set(items.map((i) => i.id));
+    for (const x of have) if (x.date >= from && x.date <= to && !x.p && !keep.has(x.id)) st('tx').delete(x.id);
+    for (const i of items) { const cur = have.find((x) => x.id === i.id); if (!(cur && cur.p)) st('tx').put({ ...i, p: 0 }); }
+  });
+}
+async function offMeta(k, v) {
+  return offTx(['meta'], 'readwrite', (st, pr) => (v === undefined ? pr(st('meta').get(k)) : (v === null ? st('meta').delete(k) : st('meta').put(v, k))));
+}
+async function offCount() { qCount = (await offSafe(offTx(['q'], 'readonly', (st, pr) => pr(st('q').count())))) || 0; paintChip(); }
+async function offClear() { await offSafe(offTx(['tx', 'adv', 'q', 'meta'], 'readwrite', (st) => { ['tx', 'adv', 'q', 'meta'].forEach((n) => st(n).clear()); })); qCount = 0; paintChip(); }
+// terapkan ke cache lokal + (opsional) masukkan ke antrean
+async function offApply(op, queue) {
+  await offTx(['tx', 'q'], 'readwrite', async (st, pr) => {
+    const p = queue ? 1 : 0;
+    if (op.op === 'add') op.items.forEach((i) => st('tx').put({ ...strip(i), p }));
+    else if (op.op === 'update') { const cur = await pr(st('tx').get(op.id)); if (cur) st('tx').put({ ...cur, amount: op.amount, desc: op.desc, p: cur.p || p }); }
+    else if (op.op === 'delete') st('tx').delete(op.id);
+    if (queue) st('q').add(op);
+  });
+  if (queue) { await offCount(); flushQueue(); }
+}
+const opBody = (o) => (o.op === 'add' ? { action: 'add', items: o.items } : o.op === 'update' ? { action: 'update', id: o.id, amount: o.amount, desc: o.desc } : { action: 'delete', id: o.id });
+// kirim antrean berurutan ke server; berhenti bila offline / sesi habis / server error
+async function flushQueue() {
+  if (flushing || !state.user) return;
+  const first = await offSafe(offTx(['q'], 'readonly', (st, pr) => pr(st('q').count())));
+  if (!first) return;
+  flushing = true; paintChip();
+  let sent = false;
+  try {
+    for (;;) {
+      const row = await offTx(['q'], 'readonly', async (st, pr) => { const ks = await pr(st('q').getAllKeys()); return ks.length ? { k: ks[0], v: await pr(st('q').get(ks[0])) } : null; });
+      if (!row) break;
+      try { await api('/api/data', opBody(row.v)); }
+      catch (e) {
+        // offline / sesi habis (401) / server error (5xx) / terlalu sering (429): antrean dipertahankan.
+        // 4xx lain berarti server menolak operasi itu, jadi dibuang agar antrean tidak macet.
+        if (e.offline || !e.status || e.status >= 500 || e.status === 429) break;
+      }
+      await offTx(['q', 'tx'], 'readwrite', async (st, pr) => {
+        st('q').delete(row.k);
+        const ids = row.v.op === 'add' ? row.v.items.map((i) => i.id) : row.v.op === 'update' ? [row.v.id] : [];
+        for (const id of ids) { const cur = await pr(st('tx').get(id)); if (cur && cur.p) st('tx').put({ ...cur, p: 0 }); }
+      });
+      sent = true; await offCount();
+    }
+  } catch (e) { /* IndexedDB bermasalah: coba lagi nanti */ }
+  flushing = false; await offCount();
+  if (sent && state.user && typeof render === 'function' && !document.querySelector('.sheet.open')) render();
+}
+const hasQueue = () => qCount > 0;
+const dbRange = async (from, to) => {
+  try {
+    const items = (await api(`/api/data?from=${from}&to=${to}`)).items;
+    await offSafe(offCacheRange(from, to, items));
+    const pend = (await offSafe(offAll()) || []).filter((x) => x.p && x.date >= from && x.date <= to);
+    return pend.length ? items.filter((i) => !pend.some((x) => x.id === i.id)).concat(pend.map(strip)).sort(byOrder) : items;
+  } catch (e) {
+    if (!e.offline) throw e;
+    return ((await offSafe(offAll())) || []).filter((x) => x.date >= from && x.date <= to).map(strip).sort(byOrder);
+  }
+};
+const dbGetAdvice = async (date) => {
+  try {
+    const a = (await api(`/api/data?advice=${date}`)).advice;
+    if (a) await offSafe(offTx(['adv'], 'readwrite', (st) => { st('adv').put({ ...a }); }));
+    return a;
+  } catch (e) {
+    if (!e.offline) throw e;
+    return (await offSafe(offTx(['adv'], 'readonly', (st, pr) => pr(st('adv').get(date))))) || null;
+  }
+};
 const dbPutAdvice = (a) => api('/api/data', { action: 'advice', date: a.date, text: a.text, createdAt: a.createdAt });
-const dbAdd = (items) => api('/api/data', { action: 'add', items });
-const dbUpdate = (item) => api('/api/data', { action: 'update', id: item.id, amount: item.amount, desc: item.desc });
-const dbDelete = (id) => api('/api/data', { action: 'delete', id });
-const dbClear = () => api('/api/data', { action: 'clear' });
+// tulis: bila antrean masih ada atau jaringan putus, simpan lokal dulu lalu sinkron otomatis
+async function dbWrite(op) {
+  if (hasQueue()) return offApply(op, true);
+  try { await api('/api/data', opBody(op)); await offSafe(offApply(op, false)); }
+  catch (e) { if (!e.offline) throw e; await offApply(op, true); }
+}
+const dbAdd = (items) => dbWrite({ op: 'add', items });
+const dbUpdate = (item) => dbWrite({ op: 'update', id: item.id, amount: item.amount, desc: item.desc });
+const dbDelete = (id) => dbWrite({ op: 'delete', id });
+const dbClear = async () => { await api('/api/data', { action: 'clear' }); await offSafe(offTx(['tx', 'adv', 'q'], 'readwrite', (st) => { ['tx', 'adv', 'q'].forEach((n) => st(n).clear()); })); qCount = 0; paintChip(); };
 async function dbExport() {
   const d = await api('/api/data?export=1');
   return { app: 'catatan-keuangan', version: 1, exportedAt: new Date().toISOString(), tx: d.tx, advice: d.advice };
@@ -1308,11 +1419,18 @@ function resetAppState() {
   admSeq++; clearTimeout(admTimer);
   $('admList').replaceChildren(); $('admQ').value = '';
   ['acMail', 'acUser', 'acCur', 'acNew'].forEach((id) => { $(id).value = ''; });
+  paintChip();
 }
 // masuk ke aplikasi: layar loading tetap tampil sampai data pertama selesai dimuat
 async function startApp(user) {
   resetAppState();
+  // data offline milik satu akun: bila yang masuk akun lain, buang cache + antrean akun sebelumnya
+  const prev = await offSafe(offMeta('user'));
+  if (prev && user.id && prev.id !== user.id) await offClear();
+  await offSafe(offMeta('user', { id: user.id, username: user.username, email: user.email, isAdmin: !!user.isAdmin }));
+  await offCount();
   state.user = user;
+  paintChip();
   applyRole();
   try { await render(); } catch (e) {
     $('detail').replaceChildren(h('p', { class: 'empty', text: 'Gagal memuat data: ' + e.message }));
@@ -1322,6 +1440,7 @@ async function startApp(user) {
   gateToken++;
   heroStop();
   gateDrops = true;
+  flushQueue();
   if (reduceMotion()) { gate.hidden = true; return; }
   // tirai layar awal terangkat ke atas, memperlihatkan Cal di bawahnya
   gate.animate([{ transform: 'none' }, { transform: 'translateY(-100%)' }], { duration: 620, easing: 'cubic-bezier(.65,0,.25,1)', id: 'gate-move', fill: 'forwards' })
@@ -1334,13 +1453,18 @@ onSessionLost = () => {
 };
 async function boot() {
   showGate('loading');
-  let user = null, down = false;
+  let user = null, down = false, noNet = false;
   try {
     const r = await fetch('/api/auth', { cache: 'no-store' });
-    if (r.ok) user = (await r.json()).user;
+    if (r.ok) { user = (await r.json()).user; setNet(true); }
     else if (r.status !== 401) down = true;
-  } catch (e) { down = true; }
+  } catch (e) { down = true; noNet = true; setNet(false); }
   if (user) return startApp(user);
+  // tanpa internet: buka dengan identitas yang tersimpan dari login sebelumnya (sesi di server tetap berlaku)
+  if (noNet) {
+    const cu = await offSafe(offMeta('user'));
+    if (cu && cu.id) return startApp(cu);
+  }
   if (down) { showGate('login', 'Tidak bisa terhubung ke server. Periksa internet lalu muat ulang.'); return; }
   showGate('landing');
 }
@@ -1362,8 +1486,14 @@ async function submitAuth(kind, e) {
 }
 async function doLogout() {
   if (!(await ask({ icon: 'logout', title: 'Keluar dari akun?', ok: 'Keluar',
-    text: `@${state.user.username} akan keluar dari perangkat ini. Catatanmu tetap tersimpan dan bisa dibuka lagi dengan login.` }))) return;
-  try { await api('/api/auth', { action: 'logout' }); } catch (e) { /* tetap keluar di sisi aplikasi */ }
+    text: `@${state.user.username} akan keluar dari perangkat ini. Catatanmu tetap tersimpan dan bisa dibuka lagi dengan login.` +
+      (qCount ? ` Ada ${qCount} perubahan offline yang belum tersinkron dan akan hilang bila kamu keluar sekarang.` : '') }))) return;
+  try { await api('/api/auth', { action: 'logout' }); }
+  catch (e) {
+    if (e.offline) { await ask({ icon: 'warn', title: 'Perlu internet', text: 'Keluar akun butuh koneksi internet. Sambungkan dulu lalu coba lagi.', ok: 'Oke', cancel: null }); return; }
+    /* galat lain: tetap keluar di sisi aplikasi */
+  }
+  await offClear();
   resetAppState();
   showGate('login');
 }
@@ -1390,6 +1520,7 @@ async function submitDeleteAccount(e) {
   $('delErr').textContent = '';
   try {
     await api('/api/auth', { action: 'delete', password: $('delPass').value });
+    await offClear();
     resetAppState();
     showGate('landing');
   } catch (ex) {
@@ -1411,6 +1542,7 @@ function applyRole() {
 function setSelf(u) {
   state.user = { ...state.user, username: u.username, email: u.email, isAdmin: !!u.isAdmin };
   $('acctName').textContent = '@' + state.user.username;
+  if (state.user.id) offSafe(offMeta('user', { id: state.user.id, username: state.user.username, email: state.user.email, isAdmin: state.user.isAdmin }));
 }
 function openAcct() {
   if (state.user.isAdmin) openAdmin(); else openMyAcct();
@@ -1615,6 +1747,10 @@ function init() {
   $('formRegister').addEventListener('submit', (e) => submitAuth('register', e));
   setInterval(checkRollover, 30000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkRollover(); render(); } });
+  window.addEventListener('online', () => { setNet(true); flushQueue(); });
+  window.addEventListener('offline', () => setNet(false));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) flushQueue(); });
+  setInterval(flushQueue, 30000);
   boot();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

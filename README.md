@@ -45,6 +45,13 @@
 </p>
 <p align="center"><sub>Tampilan asli aplikasi dengan data contoh. Isi saran AI di gambar hanyalah contoh.</sub></p>
 
+## Mode offline (catatan harian)
+- Catatan yang pernah dimuat saat online tersimpan di perangkat, jadi tetap tampil saat offline. Catatan baru dari perangkat lain tidak muncul sampai online lagi.
+- Catatan yang dibuat, diubah, atau dihapus saat offline disimpan dulu di perangkat dan dikirim otomatis ke database begitu internet kembali. Di Beranda muncul label "Offline" / "n belum tersinkron".
+- Login pertama harus online. Setelah itu aplikasi bisa dibuka offline (sesi berlaku 400 hari). Bila sesi sudah habis, kamu diminta login lagi dan antrean tetap dikirim.
+- Keluar akun butuh internet, dan menghapus data lokal. Target Barang, AI, impor/ekspor, dan kelola akun tetap butuh internet.
+- Pembungkus APK (WebToNative): pastikan cookie dan penyimpanan lokal tidak dihapus tiap aplikasi ditutup, kalau tidak login offline tidak bertahan.
+
 ## Pakai Cal
 
 1. Buka link Cal di browser HP, tekan **Selanjutnya**, lalu **Daftar** (Gmail, username, password). Berikutnya cukup **Login**; setelah itu Cal langsung terbuka sampai kamu **Logout** (Pengaturan, ikon gerigi).

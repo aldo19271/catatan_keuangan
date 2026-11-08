@@ -559,3 +559,6 @@ html,*{scrollbar-width:none;-ms-overflow-style:none}
 .gbtn-buy.hot{background:var(--grn);color:#06150d;border-color:var(--grn);box-shadow:0 4px 0 #1b7f4b,0 0 24px rgba(53,208,127,.3);animation:gBeat 2s ease-in-out infinite}
 .gbtn-buy.hot:active{transform:translateY(4px);box-shadow:0 0 0 transparent}
 @keyframes gBeat{50%{transform:scale(1.02)}}
+
+.net-chip{margin-left:auto;margin-right:10px;padding:4px 10px;border-radius:99px;background:var(--s2);border:1px solid var(--line);color:var(--or2);font-size:.72rem;font-weight:600;white-space:nowrap}
+.net-chip[hidden]{display:none}
