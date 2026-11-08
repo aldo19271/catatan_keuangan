@@ -8,6 +8,9 @@
     },
     "api/data.js": {
       "maxDuration": 30
+    },
+    "api/goals.js": {
+      "maxDuration": 30
     }
   },
   "headers": [

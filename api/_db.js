@@ -47,6 +47,28 @@ const SCHEMA = [
      PRIMARY KEY (user_id, id)
    )`,
   `CREATE INDEX IF NOT EXISTS tx_user_date_idx ON tx (user_id, date)`,
+  // target barang: satu baris per target; saldo tabungan = jumlah goal_entries (positif = nabung, negatif = tarik)
+  `CREATE TABLE IF NOT EXISTS goals (
+     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     id TEXT NOT NULL,
+     name TEXT NOT NULL,
+     price BIGINT NOT NULL,
+     photo TEXT,
+     status TEXT NOT NULL DEFAULT 'active',
+     created_at BIGINT NOT NULL DEFAULT 0,
+     closed_at BIGINT,
+     PRIMARY KEY (user_id, id)
+   )`,
+  `CREATE TABLE IF NOT EXISTS goal_entries (
+     user_id BIGINT NOT NULL,
+     goal_id TEXT NOT NULL,
+     id TEXT NOT NULL,
+     amount BIGINT NOT NULL,
+     created_at BIGINT NOT NULL DEFAULT 0,
+     PRIMARY KEY (user_id, id),
+     FOREIGN KEY (user_id, goal_id) REFERENCES goals (user_id, id) ON DELETE CASCADE
+   )`,
+  `CREATE INDEX IF NOT EXISTS goal_entries_goal_idx ON goal_entries (user_id, goal_id, created_at)`,
   // kode reset password (lupa password): satu baris per Gmail; kode disimpan sebagai hash, bukan teks asli
   `CREATE TABLE IF NOT EXISTS reset_codes (
      email_lc TEXT PRIMARY KEY,

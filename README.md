@@ -33,6 +33,7 @@
 | **Akun sendiri** | Daftar dengan Gmail, username, dan password, lalu login. Setelah login, Cal langsung terbuka sampai kamu menekan **Logout**. Catatan tersimpan di database Neon per akun. |
 | **Lupa password** | Di halaman Login, tekan **Lupa password?**: isi Gmail akun, tekan **Kirim kode** (jeda 1 menit untuk kirim ulang), ketik kode 6 angka dari email, lalu username tampil dan kamu mengisi password baru. Kode berlaku 10 menit, sekali pakai, dan dibatalkan setelah 5 kali salah. Setelah password diganti, semua perangkat harus login ulang. Akun admin bawaan memakai email palsu, jadi isi Gmail asli di **Kelola** dulu bila admin ingin memakai fitur ini. |
 | **Dialog kustom** | Konfirmasi logout, impor, hapus catatan, hapus semua data, dan hapus akun memakai dialog bawaan Cal (bukan dialog browser): muncul dengan gerak pegas, ikon tergambar, tombol bergaya tuts, dan kartunya bisa digeser ke bawah untuk menutup. Scrollbar disembunyikan, halaman tetap bisa digulir. |
+| **Target Barang** | Footer punya tab **Beranda** dan **Target** (di kiri tombol +). Di Target, tekan + untuk membuat target: nama dan harga barang wajib, foto opsional (otomatis dikecilkan). Tiap target punya catatan tabungan **Nabung / Tarik** (saldo tidak bisa minus). Saat saldo mencapai harga muncul "udah cukup ni bro". **Sudah beli, tutup tabungan** memindahkan target ke daftar *Sudah terbeli* (dua dialog konfirmasi); **Batal beli, hapus target** menghapus detail dan catatan tabungannya (dua dialog konfirmasi). Tombol Simpan/Buat memakai konfirmasi tekan-dua-kali. Hapus akun ikut menghapus semua target. |
 | **Lihat / sembunyikan password** | Ikon mata di kolom password pada halaman Login, Daftar, dan lembar akun. |
 | **Akun (pengguna)** | Tombol **Akun** di kiri tombol Developer: ubah username, Gmail, dan password sendiri. Ganti password wajib mengisi password saat ini, dan perangkat lain otomatis keluar. |
 | **Kelola (admin)** | Akun bawaan **admin** (username `admin`, password `admin`) melihat tombol **Kelola** di tempat yang sama: mencari akun lewat Gmail, username, atau password (cocok persis), lalu mengubah Gmail, username, atau password akun mana pun, termasuk akun admin sendiri. **Segera ganti password admin setelah deploy pertama.** Akun admin tidak bisa dihapus dan username `admin` dicadangkan. |
@@ -102,6 +103,7 @@ api/auth.js                       daftar, login, logout, lupa password, ubah pro
 api/data.js                       catatan dan saran milik akun
 api/_db.js  api/_auth.js          pendukung: koneksi Neon, password, sesi
 api/_mail.js                      pendukung: kirim email kode lewat Gmail SMTP
+api/goals.js                      target barang dan catatan tabungan
 docs/readme/                      gambar untuk README
 vercel.json  package.json
 ```

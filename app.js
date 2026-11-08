@@ -95,7 +95,7 @@ async function dbImport(txs, advices) {
 
 /* ================= State ================= */
 // mode: 'week' | 'month' | 'year' (periode grafik analisis). offset = minggu pada kalender, pOffset = bulan/tahun pada grafik.
-const state = { user: null, mode: 'week', offset: 0, pOffset: 0, selected: todayKey(), lastToday: todayKey(), seq: 0, dir: 0, pending: new Set() };
+const state = { user: null, view: 'home', mode: 'week', offset: 0, pOffset: 0, selected: todayKey(), lastToday: todayKey(), seq: 0, dir: 0, pending: new Set() };
 const MODE_ORDER = { year: 0, month: 1, week: 2 };
 const reduceMotion = () => false;
 const EASE = 'cubic-bezier(.2,.8,.2,1)';
@@ -375,6 +375,7 @@ const DLG_IC = {
   logout: '<path pathLength="1" d="M9 4H5v16h4"/><path pathLength="1" d="M16 8l4 4-4 4"/><path pathLength="1" d="M20 12H9"/>',
   import: '<path pathLength="1" d="M12 3v12"/><path pathLength="1" d="M7 10l5 5 5-5"/><path pathLength="1" d="M4 19h16"/>',
   trash: '<path pathLength="1" d="M4 7h16"/><path pathLength="1" d="M9 7V4h6v3"/><path pathLength="1" d="M6 7l1 13h10l1-13"/>',
+  check: '<path pathLength="1" d="M20 12a8 8 0 1 1-4-6.9"/><path pathLength="1" d="M8.5 11.5l3 3L20 6"/>',
   warn: '<path pathLength="1" d="M12 3l10 18H2z"/><path pathLength="1" d="M12 10v5"/><path pathLength="1" d="M12 18v.5"/>',
 };
 let dlgClosed = Promise.resolve();
@@ -476,6 +477,8 @@ function closeSheet(id) {
   if (!document.querySelector('.sheet.open')) document.body.classList.remove('lock');
   if (id === 'sheetSaran') saranKey = null;
   if (id === 'sheetForm') editing = null;
+  if (id === 'sheetGoal') { gs.openId = null; if ($('geSave')._disarm) $('geSave')._disarm(); }
+  if (id === 'sheetGoalNew' && $('gnSave')._disarm) $('gnSave')._disarm();
 }
 document.addEventListener('click', (e) => {
   const c = e.target.closest('[data-close]');
@@ -716,6 +719,354 @@ async function doImport(file) {
   } catch (e) { msg.textContent = 'Gagal mengimpor: ' + e.message; }
 }
 
+/* ================= Target barang ================= */
+// Halaman Target: daftar barang yang ditabung, dengan foto (opsional), nama dan harga (wajib). Tiap barang punya catatan tabungan
+// (nabung / tarik). Saldo >= harga -> "udah cukup ni bro". Tutup tabungan (sudah beli) atau batal beli (hapus) memakai dua langkah;
+// tombol simpan di form memakai konfirmasi tekan-dua-kali (tombol berubah dan menghitung mundur 4 detik).
+const GOAL_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>';
+const CHECK_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-4-6.9"/><path d="M8.5 11.5l3 3L20 6"/></svg>';
+const EMPTY_IC = '<svg viewBox="0 0 84 84" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle pathLength="1" cx="40" cy="44" r="30"/><circle pathLength="1" cx="40" cy="44" r="18"/><circle pathLength="1" cx="40" cy="44" r="6"/><path pathLength="1" d="M42 42 74 10M62 10h12v12"/></svg>';
+const RING_C = 2 * Math.PI * 48;
+const gs = { list: [], loaded: false, seq: 0, openId: null, entries: [], dir: 'in', photo: null, busy: false };
+const gPct = (g) => Math.min(100, Math.floor((g.saved / g.price) * 100));
+const gReached = (g) => g.saved >= g.price;
+const goalApi = (body) => api('/api/goals', body);
+const curGoal = () => gs.list.find((x) => x.id === gs.openId) || null;
+const withIcon = (cls, svg) => { const e = h('span', { class: cls }); e.innerHTML = svg; return e; }; // svg = konstanta di atas, bukan input pengguna
+const fmtStamp = (ms) => { const d = new Date(ms); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+function goalThumb(g, cls) {
+  const box = h('span', { class: cls });
+  if (g.photo) box.append(h('img', { src: g.photo, alt: '', decoding: 'async' }));
+  else box.innerHTML = GOAL_IC;
+  return box;
+}
+function goalCard(g, i, animate) {
+  const p = gPct(g), ok = gReached(g);
+  const fill = h('div', { class: 'gfill' });
+  const card = h('button', {
+    type: 'button', class: 'gcard' + (ok ? ' ok' : '') + (animate ? '' : ' still'), style: `--d:${Math.min(i, 8) * 0.06}s`,
+    'aria-label': `${g.name}, ${ok ? 'udah cukup' : p + ' persen'}. Buka detail`, onclick: () => openGoal(g.id),
+  },
+  goalThumb(g, 'gthumb'),
+  h('div', { class: 'gbody' },
+    h('div', { class: 'gname', text: g.name }),
+    h('div', { class: 'gprice', text: rupiah(g.price) }),
+    h('div', { class: 'gbar' }, fill),
+    h('div', { class: 'gmeta' },
+      h('span', null, h('b', { text: rupiah(g.saved) }), ' terkumpul'),
+      ok ? h('span', { class: 'gok' }, withIcon('', CHECK_IC), 'udah cukup ni bro') : h('span', { text: p + '%' }))));
+  requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = (ok ? 100 : p) + '%'; }));
+  return card;
+}
+function renderGoals(animate = true, bornId = null) {
+  const active = gs.list.filter((g) => g.status === 'active');
+  const done = gs.list.filter((g) => g.status === 'done');
+  const sum = active.reduce((a, g) => a + g.saved, 0), tot = active.reduce((a, g) => a + g.price, 0);
+  const sub = $('gSub');
+  sub.replaceChildren();
+  if (!active.length) sub.textContent = 'Menabung untuk barang yang kamu incar.';
+  else sub.append(`${active.length} target aktif · terkumpul `, h('b', { text: rupiah(sum) }), ` dari ${rupiah(tot)}`);
+  const list = $('goalList');
+  if (!active.length) {
+    const empty = h('div', { class: 'gempty' }, withIcon('', EMPTY_IC), h('strong', { text: 'Belum ada target' }),
+      h('span', { text: 'Tekan tombol + untuk menambah barang yang ingin kamu beli, lalu mulai menabung untuknya.' }));
+    list.replaceChildren(empty);
+  } else {
+    list.replaceChildren(...active.map((g, i) => {
+      const c = goalCard(g, i, animate);
+      if (g.id === bornId) { c.classList.remove('still'); c.classList.add('born'); }
+      return c;
+    }));
+  }
+  $('goalDone').hidden = !done.length;
+  $('goalDoneN').textContent = String(done.length);
+  $('goalDoneList').replaceChildren(...done.map((g) => h('div', { class: 'gditem' },
+    goalThumb(g, 'gthumb'),
+    h('div', { class: 'gbody' }, h('div', { class: 'gname', text: g.name }),
+      h('div', { class: 'gprice', text: `${rupiah(g.price)} · dibeli ${g.closedAt ? fmtStamp(g.closedAt).split(' · ')[0] : ''}` })),
+    withIcon('', CHECK_IC))));
+}
+async function loadGoals() {
+  const seq = ++gs.seq;
+  if (!gs.loaded) $('goalList').replaceChildren(h('div', { class: 'gskel' }), h('div', { class: 'gskel' }));
+  try {
+    const d = await api('/api/goals');
+    if (seq !== gs.seq || !state.user) return;
+    gs.list = d.goals; gs.loaded = true;
+    renderGoals(true);
+  } catch (e) {
+    if (seq !== gs.seq || !state.user) return;
+    if (!gs.loaded) $('goalList').replaceChildren(h('p', { class: 'empty', text: 'Gagal memuat target: ' + e.message }));
+  }
+}
+
+/* ---- tombol konfirmasi tekan-dua-kali ---- */
+// Tekan pertama: tombol berubah (hijau/merah) menyebut aksinya dan menghitung mundur 4 detik. Tekan kedua: dijalankan.
+function bindArm(btn, prepare, commit) {
+  let timer = 0, armed = false;
+  const reset = () => { armed = false; btn.classList.remove('armed', 'out'); btn.textContent = btn.dataset.label; };
+  const disarm = () => { clearTimeout(timer); timer = 0; if (armed) reset(); };
+  btn._disarm = disarm;
+  btn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (btn.disabled) return;
+    if (!armed) {
+      const r = prepare();
+      if (!r) return;
+      armed = true; btn.textContent = r.label;
+      btn.classList.remove('armed'); void btn.offsetWidth; btn.classList.add('armed');
+      btn.classList.toggle('out', r.cls === 'out');
+      timer = setTimeout(disarm, 4000);
+      return;
+    }
+    clearTimeout(timer); timer = 0; reset();
+    btn.disabled = true;
+    try { await commit(); } finally { btn.disabled = false; }
+  });
+}
+function bindMoneyFree(inp, cb) {
+  inp.addEventListener('input', () => {
+    const d = inp.value.replace(/\D/g, '').slice(0, 12).replace(/^0+(?=\d)/, '');
+    inp.value = d === '' ? '' : fmtNum(Number(d));
+    if (cb) cb();
+  });
+}
+function nudge(el) { if (el && el.animate && !reduceMotion()) el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(-3px)' }, { transform: 'none' }], { duration: 320 }); }
+
+/* ---- target baru ---- */
+async function compressImage(file) {
+  if (!file || !/^image\//.test(file.type)) throw new Error('File harus berupa gambar.');
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {
+    bmp = await new Promise((res, rej) => {
+      const img = new Image(), u = URL.createObjectURL(file);
+      img.onload = () => { URL.revokeObjectURL(u); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Gambar tidak bisa dibaca.')); };
+      img.src = u;
+    });
+  }
+  const w0 = bmp.width || bmp.naturalWidth, h0 = bmp.height || bmp.naturalHeight;
+  if (!w0 || !h0) throw new Error('Gambar tidak bisa dibaca.');
+  for (const max of [640, 520, 420, 320]) {
+    const k = Math.min(1, max / Math.max(w0, h0));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w0 * k)); c.height = Math.max(1, Math.round(h0 * k));
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    for (const q of [0.82, 0.72, 0.62, 0.52]) {
+      const url = c.toDataURL('image/jpeg', q);
+      if (url.length <= 70000) return url;
+    }
+  }
+  throw new Error('Foto terlalu besar. Coba foto lain.');
+}
+function paintNewPhoto() {
+  $('gnPick').hidden = !!gs.photo;
+  $('gnPrev').hidden = !gs.photo;
+  if (gs.photo) $('gnImg').src = gs.photo; else $('gnImg').removeAttribute('src');
+}
+function openGoalNew() {
+  gs.photo = null;
+  $('gnName').value = ''; $('gnPrice').value = ''; $('gnErr').textContent = '';
+  if ($('gnSave')._disarm) $('gnSave')._disarm();
+  paintNewPhoto();
+  openSheet('sheetGoalNew');
+}
+async function pickPhoto(file) {
+  $('gnErr').textContent = '';
+  try { gs.photo = await compressImage(file); paintNewPhoto(); } catch (e) { $('gnErr').textContent = e.message; }
+}
+function prepareNewGoal() {
+  const name = $('gnName').value.trim().replace(/\s+/g, ' '), price = parseAmount($('gnPrice').value);
+  if (!name) { $('gnErr').textContent = 'Nama barang wajib diisi.'; nudge($('gnName')); $('gnName').focus(); return null; }
+  if (price <= 0) { $('gnErr').textContent = 'Harga barang wajib diisi.'; nudge($('gnPrice').parentNode); $('gnPrice').focus(); return null; }
+  $('gnErr').textContent = '';
+  return { label: 'Tekan lagi untuk membuat target' };
+}
+async function commitNewGoal() {
+  const name = $('gnName').value.trim().replace(/\s+/g, ' '), price = parseAmount($('gnPrice').value);
+  try {
+    const d = await goalApi({ action: 'create', name, price, photo: gs.photo });
+    const at = gs.list.findIndex((x) => x.status === 'done');
+    gs.list.splice(at < 0 ? gs.list.length : at, 0, d.goal);
+    gs.loaded = true;
+    closeSheet('sheetGoalNew');
+    renderGoals(false, d.goal.id);
+  } catch (e) { $('gnErr').textContent = e.message; }
+}
+
+/* ---- detail target ---- */
+function burst(host) {
+  const box = h('div', { class: 'gconf' });
+  host.append(box);
+  const cols = ['#35d07f', '#ff9a4d', '#ffd166', '#7bd8ff', '#ff6b8b'];
+  for (let i = 0; i < 18; i++) {
+    const p = h('i', { style: `background:${cols[i % cols.length]}` });
+    box.append(p);
+    const a = (Math.PI * 2 * i) / 18 + Math.random() * 0.4, d = 56 + Math.random() * 56;
+    p.animate([{ transform: 'translate(-50%,-50%) scale(1)' },
+      { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d + 18}px)) rotate(${Math.random() * 540}deg) scale(.25)` }],
+    { duration: 900 + Math.random() * 450, easing: 'cubic-bezier(.1,.7,.3,1)', fill: 'forwards' });
+  }
+  setTimeout(() => box.remove(), 1600);
+}
+function paintGoal(g, fromPct) {
+  const ok = gReached(g), p = gPct(g);
+  $('gdName').textContent = g.name;
+  const hero = $('gdHero');
+  hero.classList.toggle('has', !!g.photo);
+  hero.replaceChildren();
+  if (g.photo) hero.append(h('img', { src: g.photo, alt: 'Foto ' + g.name })); else hero.innerHTML = GOAL_IC;
+  $('gdSaved').textContent = rupiah(g.saved);
+  $('gdPrice').textContent = 'dari ' + rupiah(g.price);
+  $('gdPct').textContent = p + '%';
+  $('gdRing').classList.toggle('ok', ok);
+  const fg = $('gdFg');
+  fg.style.strokeDasharray = String(RING_C);
+  if (fromPct != null) { fg.style.transition = 'none'; fg.style.strokeDashoffset = String(RING_C * (1 - fromPct / 100)); void fg.getBoundingClientRect(); fg.style.transition = ''; }
+  fg.style.strokeDashoffset = String(RING_C * (1 - (ok ? 100 : p) / 100));
+  const msg = $('gdMsg');
+  const nextText = ok ? 'udah cukup ni bro' : 'Kurang ' + rupiah(g.price - g.saved) + ' lagi';
+  if (msg.textContent !== nextText) {
+    msg.textContent = nextText;
+    msg.className = 'gd-msg ' + (ok ? 'ok' : 'need');
+  }
+  $('gdBuy').classList.toggle('hot', ok);
+  updatePreview();
+}
+function renderEntries(animate) {
+  const ul = $('geList');
+  if (!gs.entries.length) { ul.replaceChildren(h('li', { class: 'ge-empty', text: 'Belum ada catatan tabungan.' })); return; }
+  ul.replaceChildren(...gs.entries.map((e, i) => h('li', { class: 'ge-item', style: animate ? `--d:${Math.min(i, 6) * 0.05}s` : 'animation:none' },
+    h('div', null, h('span', { text: e.amount > 0 ? 'Nabung' : 'Tarik' }), h('small', { text: fmtStamp(e.createdAt) })),
+    h('b', { class: e.amount > 0 ? 'in' : 'out', text: (e.amount > 0 ? '+' : '−') + rupiah(Math.abs(e.amount)) }))));
+}
+async function loadEntries(id) {
+  try {
+    const d = await api('/api/goals?entries=' + encodeURIComponent(id));
+    if (gs.openId !== id) return;
+    gs.entries = d.entries; renderEntries(true);
+  } catch (e) { if (gs.openId === id) $('geList').replaceChildren(h('li', { class: 'ge-empty', text: 'Gagal memuat riwayat.' })); }
+}
+function setDir(dir) {
+  gs.dir = dir;
+  $('geTog').classList.toggle('out', dir === 'out');
+  $('geTog').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dir === dir)));
+}
+function updatePreview() {
+  const g = curGoal(), a = parseAmount($('geAmt').value), el = $('gePrev');
+  el.className = 'gprev';
+  if (!g || a <= 0) { el.textContent = ''; return; }
+  if (gs.dir === 'out' && a > g.saved) { el.textContent = 'Melebihi tabungan (' + rupiah(g.saved) + ').'; el.classList.add('bad'); return; }
+  el.textContent = 'Tabungan jadi ' + rupiah(g.saved + (gs.dir === 'in' ? a : -a));
+}
+function openGoal(id) {
+  const g = gs.list.find((x) => x.id === id);
+  if (!g) return;
+  gs.openId = id; gs.entries = [];
+  setDir('in');
+  $('geAmt').value = ''; $('geErr').textContent = ''; $('gePrev').textContent = '';
+  if ($('geSave')._disarm) $('geSave')._disarm();
+  paintGoal(g, 0);
+  $('geList').replaceChildren(h('li', { class: 'ge-empty', text: 'Memuat…' }));
+  openSheet('sheetGoal');
+  loadEntries(id);
+}
+function prepareEntry() {
+  const g = curGoal(), a = parseAmount($('geAmt').value);
+  if (!g) return null;
+  if (a <= 0) { $('geErr').textContent = 'Masukkan nominal dulu.'; nudge($('geAmt').parentNode); $('geAmt').focus(); return null; }
+  if (gs.dir === 'out' && a > g.saved) { $('geErr').textContent = 'Nominal melebihi tabungan yang ada.'; nudge($('geAmt').parentNode); return null; }
+  if (gs.dir === 'in' && g.saved + a > MAX_AMOUNT) { $('geErr').textContent = 'Total tabungan terlalu besar.'; return null; }
+  $('geErr').textContent = '';
+  return { label: `Tekan lagi: ${gs.dir === 'in' ? 'nabung' : 'tarik'} ${rupiah(a)}`, cls: gs.dir };
+}
+async function commitEntry() {
+  const g = curGoal(), a = parseAmount($('geAmt').value), dir = gs.dir;
+  if (!g || a <= 0) return;
+  const was = gReached(g), from = gPct(g);
+  try {
+    const d = await goalApi({ action: 'entry', goalId: g.id, dir, amount: a });
+    g.saved = d.saved;
+    gs.entries.unshift(d.entry);
+    $('geAmt').value = ''; $('gePrev').textContent = ''; $('geErr').textContent = '';
+    paintGoal(g, from);
+    renderEntries(false);
+    renderGoals(false);
+    if (!was && gReached(g)) burst($('gdRing'));
+  } catch (e) { $('geErr').textContent = e.message; }
+}
+async function buyGoal() {
+  const g = curGoal();
+  if (!g) return;
+  if (!(await ask({ icon: 'check', title: 'Sudah beli barangnya?', ok: 'Ya, sudah beli', text: `${g.name} akan ditandai sudah dibeli dan tabungannya ditutup.` }))) return;
+  if (!(await ask({ icon: 'check', title: 'Tutup tabungan ini?', ok: 'Tutup tabungan', text: 'Setelah ditutup, kamu tidak bisa lagi menambah atau menarik tabungan untuk barang ini.' }))) return;
+  try { await goalApi({ action: 'close', goalId: g.id }); } catch (e) {
+    await ask({ icon: 'warn', title: 'Gagal menutup tabungan', text: e.message, ok: 'Oke', cancel: null });
+    return;
+  }
+  g.status = 'done'; g.closedAt = Date.now();
+  gs.list.sort((a, b) => (a.status === b.status ? (a.status === 'done' ? b.closedAt - a.closedAt : a.createdAt - b.createdAt) : a.status === 'active' ? -1 : 1));
+  closeSheet('sheetGoal');
+  renderGoals(false);
+}
+async function cancelGoal() {
+  const g = curGoal();
+  if (!g) return;
+  if (!(await ask({ icon: 'trash', danger: true, title: 'Batal beli barang ini?', ok: 'Ya, batal beli', text: `Detail ${g.name}, fotonya, dan semua catatan tabungannya akan dihapus.` }))) return;
+  if (!(await ask({ icon: 'trash', danger: true, title: 'Peringatan terakhir', ok: 'Hapus target', text: 'Target dan seluruh catatan tabungannya dihapus permanen dan tidak bisa dikembalikan. Lanjutkan?' }))) return;
+  try { await goalApi({ action: 'remove', goalId: g.id }); } catch (e) {
+    await ask({ icon: 'warn', title: 'Gagal menghapus target', text: e.message, ok: 'Oke', cancel: null });
+    return;
+  }
+  gs.list = gs.list.filter((x) => x.id !== g.id);
+  closeSheet('sheetGoal');
+  renderGoals(false);
+}
+
+/* ---- pindah halaman: Beranda <-> Target ---- */
+let viewBusy = false;
+function syncNav() {
+  const home = state.view === 'home';
+  $('navHome').classList.toggle('on', home); $('navGoals').classList.toggle('on', !home);
+  if (home) { $('navHome').setAttribute('aria-current', 'page'); $('navGoals').removeAttribute('aria-current'); }
+  else { $('navGoals').setAttribute('aria-current', 'page'); $('navHome').removeAttribute('aria-current'); }
+  $('btnAdd').setAttribute('aria-label', home ? 'Tambah catatan' : 'Tambah target barang');
+}
+function showView(v) {
+  if (state.view === v || viewBusy) return;
+  const from = $(state.view === 'home' ? 'app' : 'goals'), to = $(v === 'home' ? 'app' : 'goals');
+  const dir = v === 'goals' ? 1 : -1;
+  state.view = v; syncNav();
+  if (v === 'goals') loadGoals();
+  window.scrollTo(0, 0);
+  to.hidden = false;
+  if (reduceMotion()) { from.hidden = true; return; }
+  viewBusy = true;
+  from.classList.add('vt'); to.classList.add('vt');
+  const end = () => {
+    from.hidden = true;
+    [from, to].forEach((el) => { el.classList.remove('vt'); el.getAnimations().forEach((an) => an.cancel()); });
+    viewBusy = false;
+  };
+  Promise.all([
+    from.animate([{ transform: 'none' }, { transform: `translateX(${-dir * 100}%)` }], { duration: 460, easing: 'cubic-bezier(.3,.9,.25,1)', fill: 'forwards' }).finished,
+    to.animate([{ transform: `translateX(${dir * 100}%)` }, { transform: 'none' }], { duration: 460, easing: 'cubic-bezier(.3,.9,.25,1)' }).finished,
+  ]).then(end, end);
+}
+function resetGoalsUI() {
+  state.view = 'home'; viewBusy = false;
+  const a = $('app'), g = $('goals');
+  [a, g].forEach((el) => { el.classList.remove('vt'); el.getAnimations().forEach((an) => an.cancel()); });
+  a.hidden = false; g.hidden = true;
+  gs.list = []; gs.loaded = false; gs.openId = null; gs.entries = []; gs.photo = null; gs.seq++;
+  $('goalList').replaceChildren(); $('goalDoneList').replaceChildren(); $('goalDone').hidden = true;
+  $('goalDoneBtn').setAttribute('aria-expanded', 'false');
+  syncNav();
+}
+
 /* ================= Akun & layar awal ================= */
 const gate = $('gate');
 const GATE_ORDER = { landing: 0, login: 1, register: 2, forgot: 3, reset: 4, loading: 9 };
@@ -952,6 +1303,7 @@ function resetAppState() {
   state.user = null; state.mode = 'week'; state.offset = 0; state.pOffset = 0; state.dir = 0;
   state.selected = todayKey(); state.lastToday = todayKey(); state.seq++; state.pending.clear();
   editing = null; saranKey = null;
+  resetGoalsUI();
   $('detail').replaceChildren();
   admSeq++; clearTimeout(admTimer);
   $('admList').replaceChildren(); $('admQ').value = '';
@@ -1196,7 +1548,24 @@ function init() {
   document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('prevP').addEventListener('click', () => { state.pOffset -= 1; state.dir = -1; render(); });
   $('nextP').addEventListener('click', () => { if (state.pOffset < 0) { state.pOffset += 1; state.dir = 1; render(); } });
-  $('btnAdd').addEventListener('click', openAdd);
+  $('btnAdd').addEventListener('click', () => { if (state.view === 'goals') openGoalNew(); else openAdd(); });
+  $('navHome').addEventListener('click', () => showView('home'));
+  $('navGoals').addEventListener('click', () => showView('goals'));
+  $('goalDoneBtn').addEventListener('click', () => { const b = $('goalDoneBtn'); b.setAttribute('aria-expanded', String(b.getAttribute('aria-expanded') !== 'true')); });
+  $('gnPick').addEventListener('click', () => $('gnFile').click());
+  $('gnChange').addEventListener('click', () => $('gnFile').click());
+  $('gnRm').addEventListener('click', () => { gs.photo = null; paintNewPhoto(); });
+  $('gnFile').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) pickPhoto(f); });
+  bindMoneyFree($('gnPrice'), () => { $('gnErr').textContent = ''; $('gnSave')._disarm(); });
+  $('gnName').addEventListener('input', () => { $('gnErr').textContent = ''; $('gnSave')._disarm(); });
+  bindArm($('gnSave'), prepareNewGoal, commitNewGoal);
+  $('formGoal').addEventListener('submit', (e) => e.preventDefault());
+  bindMoneyFree($('geAmt'), () => { $('geErr').textContent = ''; $('geSave')._disarm(); updatePreview(); });
+  $('geTog').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setDir(b.dataset.dir); $('geErr').textContent = ''; $('geSave')._disarm(); updatePreview(); }));
+  bindArm($('geSave'), prepareEntry, commitEntry);
+  $('formEntry').addEventListener('submit', (e) => e.preventDefault());
+  $('gdBuy').addEventListener('click', buyGoal);
+  $('gdCancel').addEventListener('click', cancelGoal);
   $('form').addEventListener('submit', submitForm);
   $('form').addEventListener('input', () => setFormError('')); // pesan error hilang begitu pengguna mulai mengisi
   $('btnSettings').addEventListener('click', openSettings);
