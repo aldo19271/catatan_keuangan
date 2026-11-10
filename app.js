@@ -33,6 +33,10 @@ function uid() {
   if (window.crypto && crypto.randomUUID) { try { return crypto.randomUUID(); } catch (e) { /* lanjut */ } }
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
+function rid() { // id acak huruf kecil+angka (dipakai target/tabungan yang dibuat saat offline)
+  const a = new Uint8Array(16); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach((_, i) => { a[i] = Math.random() * 256; });
+  return Array.from(a, (x) => (x % 36).toString(36)).join('');
+}
 function parseAmount(v) {
   const n = Number(String(v || '').replace(/\D/g, '') || 0);
   return Math.min(n, MAX_AMOUNT);
@@ -81,9 +85,8 @@ async function api(path, body) {
 let netOn = true, qCount = 0, flushing = false;
 function setNet(on) { if (netOn !== on) { netOn = on; paintChip(); if (on) flushQueue(); } }
 function paintChip() {
-  const c = $('netChip'); if (!c) return;
   const txt = flushing ? 'Menyinkronkan…' : !netOn ? (qCount ? `Offline · ${qCount} belum tersinkron` : 'Offline') : qCount ? `${qCount} belum tersinkron` : '';
-  c.textContent = txt; c.hidden = !txt || !state.user;
+  document.querySelectorAll('.net-chip').forEach((c) => { c.textContent = txt; c.hidden = !txt || !state.user; });
 }
 const OFF = { db: null };
 function offDb() {
@@ -106,7 +109,7 @@ async function offTx(names, mode, fn) {
 }
 const offSafe = (p) => p.catch(() => undefined); // cache gagal tidak boleh merusak alur online
 const byOrder = (x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : (x.createdAt || 0) - (y.createdAt || 0) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
-const strip = (i) => ({ id: i.id, date: i.date, type: i.type, amount: i.amount, desc: i.desc, createdAt: i.createdAt });
+const strip = (i) => ({ id: i.id, date: i.date, type: i.type, amount: i.amount, desc: i.desc, createdAt: i.createdAt, method: i.method || '' });
 async function offAll() { return offTx(['tx'], 'readonly', (st, pr) => pr(st('tx').getAll())); }
 async function offCacheRange(from, to, items) {
   await offTx(['tx'], 'readwrite', async (st, pr) => {
@@ -126,13 +129,25 @@ async function offApply(op, queue) {
   await offTx(['tx', 'q'], 'readwrite', async (st, pr) => {
     const p = queue ? 1 : 0;
     if (op.op === 'add') op.items.forEach((i) => st('tx').put({ ...strip(i), p }));
-    else if (op.op === 'update') { const cur = await pr(st('tx').get(op.id)); if (cur) st('tx').put({ ...cur, amount: op.amount, desc: op.desc, p: cur.p || p }); }
+    else if (op.op === 'update') { const cur = await pr(st('tx').get(op.id)); if (cur) st('tx').put({ ...cur, amount: op.amount, desc: op.desc, method: op.method != null ? op.method : cur.method, p: cur.p || p }); }
     else if (op.op === 'delete') st('tx').delete(op.id);
     if (queue) st('q').add(op);
   });
   if (queue) { await offCount(); flushQueue(); }
 }
-const opBody = (o) => (o.op === 'add' ? { action: 'add', items: o.items } : o.op === 'update' ? { action: 'update', id: o.id, amount: o.amount, desc: o.desc } : { action: 'delete', id: o.id });
+// permintaan server untuk satu operasi antrean: [alamat, isi]
+function opReq(o) {
+  switch (o.op) {
+    case 'add': return ['/api/data', { action: 'add', items: o.items }];
+    case 'update': return ['/api/data', { action: 'update', id: o.id, amount: o.amount, desc: o.desc, method: o.method }];
+    case 'delete': return ['/api/data', { action: 'delete', id: o.id }];
+    case 'g-create': return ['/api/goals', { action: 'create', id: o.goal.id, name: o.goal.name, price: o.goal.price, photo: o.goal.photo, createdAt: o.goal.createdAt }];
+    case 'g-entry': return ['/api/goals', { action: 'entry', goalId: o.goalId, entryId: o.entryId, dir: o.dir, amount: o.amount, createdAt: o.createdAt }];
+    case 'g-close': return ['/api/goals', { action: 'close', goalId: o.goalId }];
+    default: return ['/api/goals', { action: 'remove', goalId: o.goalId }];
+  }
+}
+async function offEnqueue(op) { await offTx(['q'], 'readwrite', (st) => { st('q').add(op); }); await offCount(); flushQueue(); }
 // kirim antrean berurutan ke server; berhenti bila offline / sesi habis / server error
 async function flushQueue() {
   if (flushing || !state.user) return;
@@ -144,7 +159,7 @@ async function flushQueue() {
     for (;;) {
       const row = await offTx(['q'], 'readonly', async (st, pr) => { const ks = await pr(st('q').getAllKeys()); return ks.length ? { k: ks[0], v: await pr(st('q').get(ks[0])) } : null; });
       if (!row) break;
-      try { await api('/api/data', opBody(row.v)); }
+      try { const [pth, bdy] = opReq(row.v); await api(pth, bdy); }
       catch (e) {
         // offline / sesi habis (401) / server error (5xx) / terlalu sering (429): antrean dipertahankan.
         // 4xx lain berarti server menolak operasi itu, jadi dibuang agar antrean tidak macet.
@@ -159,7 +174,7 @@ async function flushQueue() {
     }
   } catch (e) { /* IndexedDB bermasalah: coba lagi nanti */ }
   flushing = false; await offCount();
-  if (sent && state.user && typeof render === 'function' && !document.querySelector('.sheet.open')) render();
+  if (sent && state.user && !document.querySelector('.sheet.open')) { if (state.view === 'goals') loadGoals(); else if (state.view === 'home') render(); else if (state.view === 'stats') loadStats(); }
 }
 const hasQueue = () => qCount > 0;
 const dbRange = async (from, to) => {
@@ -187,11 +202,11 @@ const dbPutAdvice = (a) => api('/api/data', { action: 'advice', date: a.date, te
 // tulis: bila antrean masih ada atau jaringan putus, simpan lokal dulu lalu sinkron otomatis
 async function dbWrite(op) {
   if (hasQueue()) return offApply(op, true);
-  try { await api('/api/data', opBody(op)); await offSafe(offApply(op, false)); }
+  try { const [pth, bdy] = opReq(op); await api(pth, bdy); await offSafe(offApply(op, false)); }
   catch (e) { if (!e.offline) throw e; await offApply(op, true); }
 }
 const dbAdd = (items) => dbWrite({ op: 'add', items });
-const dbUpdate = (item) => dbWrite({ op: 'update', id: item.id, amount: item.amount, desc: item.desc });
+const dbUpdate = (item) => dbWrite({ op: 'update', id: item.id, amount: item.amount, desc: item.desc, method: item.method || '' });
 const dbDelete = (id) => dbWrite({ op: 'delete', id });
 const dbClear = async () => { await api('/api/data', { action: 'clear' }); await offSafe(offTx(['tx', 'adv', 'q'], 'readwrite', (st) => { ['tx', 'adv', 'q'].forEach((n) => st(n).clear()); })); qCount = 0; paintChip(); };
 async function dbExport() {
@@ -452,7 +467,7 @@ function drawDetail(key, txs, adv, rise = true) {
     ? h('ul', { class: 'txs' }, txs.map((x) => h('li', { class: `tx ${x.type}` },
       h('button', { class: 'tx-main', onclick: () => openEdit(x), 'aria-label': 'Ubah catatan' },
         h('span', { class: 'l' },
-          h('span', { class: 't', text: x.type === 'out' ? 'Pengeluaran' : 'Penghasilan' }),
+          h('span', { class: 't' }, x.type === 'out' ? 'Pengeluaran' : 'Penghasilan', x.method && h('span', { class: 'mtag', text: x.method === 'tunai' ? 'Tunai' : 'Non Tunai' })),
           h('span', { class: 'd' + (x.desc ? '' : ' none'), text: x.desc || '(tanpa deskripsi)' })),
         h('span', { class: 'a', text: (x.type === 'out' ? '− ' : '+ ') + rupiah(x.amount) })),
       h('button', { class: 'tx-del', onclick: () => removeTx(x), 'aria-label': 'Hapus catatan', text: '✕' }))))
@@ -549,7 +564,12 @@ function ask(o) {
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
-    yes.onclick = () => finish(true);
+    yes.onclick = () => {
+      if (!o.fx || reduceMotion()) { finish(true); return; }
+      if (d.classList.contains('hit')) return;
+      d.classList.add('hit');
+      setTimeout(() => { d.classList.remove('hit'); finish(true); }, 240);
+    };
     no.onclick = () => finish(false);
     $('dlgBg').onclick = () => finish(o.cancel === null ? true : false);
     document.body.classList.add('lock');
@@ -607,6 +627,11 @@ const TYPES = {
   in: { box: 'typeIn', radio: 'rIn', body: 'bodyIn', amt: 'inIn', desc: 'descIn', sum: 'sumIn' },
 };
 let formType = null; // 'out' | 'in' | null (belum memilih)
+const fm = { out: '', in: '' }; // metode pembayaran per jenis: 'tunai' | 'nontunai' | ''
+const METH_ID = { out: 'methOut', in: 'methIn' };
+function paintMeth() {
+  Object.keys(METH_ID).forEach((k) => $(METH_ID[k]).querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === fm[k]))));
+}
 
 function updateSums() {
   Object.entries(TYPES).forEach(([k, c]) => {
@@ -637,6 +662,7 @@ function setFormError(msg) { $('formErr').textContent = msg || ''; }
 
 function resetForm() {
   Object.values(TYPES).forEach((c) => { $(c.amt).value = '0'; $(c.desc).value = ''; });
+  fm.out = ''; fm.in = ''; paintMeth();
   setFormError('');
 }
 let addDate = null; // tanggal tujuan catatan baru: hari terpilih bila sudah berlalu/hari ini, selain itu hari ini
@@ -659,6 +685,7 @@ function openEdit(item) {
   const c = TYPES[item.type];
   $(c.amt).value = fmtNum(item.amount);
   $(c.desc).value = item.desc || '';
+  fm[item.type] = item.method || ''; paintMeth();
   Object.values(TYPES).forEach((t) => { $(t.radio).disabled = true; });
   setType(item.type);
   openSheet('sheetForm');
@@ -673,17 +700,24 @@ async function submitForm(e) {
     if (editing) {
       const { amount, desc } = read(editing.type);
       if (amount <= 0) { setFormError('Nominal harus lebih dari 0. Untuk membuang catatan, gunakan tombol hapus.'); return; }
-      await dbUpdate({ ...editing, amount, desc });
+      await dbUpdate({ ...editing, amount, desc, method: fm[editing.type] });
     } else {
       const out = read('out'), inc = read('in');
       if (out.amount <= 0 && inc.amount <= 0) {
         setFormError(formType ? 'Isi nominalnya terlebih dahulu.' : 'Pilih Pengeluaran atau Penghasilan, lalu isi nominalnya.');
         return;
       }
+      const miss = out.amount > 0 && !fm.out ? 'out' : inc.amount > 0 && !fm.in ? 'in' : null;
+      if (miss) {
+        if (formType !== miss) setType(miss);
+        setFormError(`Pilih Tunai atau Non Tunai untuk ${miss === 'out' ? 'pengeluaran' : 'penghasilan'}.`);
+        nudge($(METH_ID[miss]));
+        return;
+      }
       const date = addDate || todayKey(), now = Date.now();
       const items = [];
-      if (out.amount > 0) items.push({ id: uid(), date, type: 'out', amount: out.amount, desc: out.desc, createdAt: now });
-      if (inc.amount > 0) items.push({ id: uid(), date, type: 'in', amount: inc.amount, desc: inc.desc, createdAt: now + 1 });
+      if (out.amount > 0) items.push({ id: uid(), date, type: 'out', amount: out.amount, desc: out.desc, createdAt: now, method: fm.out });
+      if (inc.amount > 0) items.push({ id: uid(), date, type: 'in', amount: inc.amount, desc: inc.desc, createdAt: now + 1, method: fm.in });
       await dbAdd(items);
       state.offset = weekOffsetOf(date);
       state.selected = date;
@@ -842,6 +876,15 @@ const gs = { list: [], loaded: false, seq: 0, openId: null, entries: [], dir: 'i
 const gPct = (g) => Math.min(100, Math.floor((g.saved / g.price) * 100));
 const gReached = (g) => g.saved >= g.price;
 const goalApi = (body) => api('/api/goals', body);
+// Tulis ke server; bila antrean masih ada atau jaringan putus, simpan di antrean offline (dikirim otomatis nanti).
+async function goalWrite(op) {
+  if (hasQueue()) { await offEnqueue(op); return { queued: true }; }
+  try { const [pth, bdy] = opReq(op); return await api(pth, bdy); }
+  catch (e) { if (!e.offline) throw e; await offEnqueue(op); return { queued: true }; }
+}
+// cache lokal daftar target + riwayat tabungan per target (dipakai saat offline)
+const goalPersist = () => offSafe(offMeta('goals', gs.list));
+const entPersist = (id) => offSafe(offMeta('gent:' + id, gs.entries));
 const curGoal = () => gs.list.find((x) => x.id === gs.openId) || null;
 const withIcon = (cls, svg) => { const e = h('span', { class: cls }); e.innerHTML = svg; return e; }; // svg = konstanta di atas, bukan input pengguna
 const fmtStamp = (ms) => { const d = new Date(ms); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -856,7 +899,7 @@ function goalCard(g, i, animate) {
   const p = gPct(g), ok = gReached(g);
   const fill = h('div', { class: 'gfill' });
   const card = h('button', {
-    type: 'button', class: 'gcard' + (ok ? ' ok' : '') + (animate ? '' : ' still'), style: `--d:${Math.min(i, 8) * 0.06}s`,
+    type: 'button', class: 'gcard' + (ok ? ' ok' : '') + (animate ? '' : ' still'), style: `--d:${Math.min(i, 8) * 0.06}s`, 'data-id': g.id,
     'aria-label': `${g.name}, ${ok ? 'udah cukup' : p + ' persen'}. Buka detail`, onclick: () => openGoal(g.id),
   },
   goalThumb(g, 'gthumb'),
@@ -901,22 +944,31 @@ function renderGoals(animate = true, bornId = null) {
 async function loadGoals() {
   const seq = ++gs.seq;
   if (!gs.loaded) $('goalList').replaceChildren(h('div', { class: 'gskel' }), h('div', { class: 'gskel' }));
+  if (hasQueue()) await flushQueue(); // kirim perubahan offline dulu supaya daftar dari server sudah mutakhir
   try {
+    if (hasQueue()) throw Object.assign(new Error('antrean'), { offline: true }); // masih ada yang belum terkirim: pakai cache lokal
     const d = await api('/api/goals');
     if (seq !== gs.seq || !state.user) return;
-    gs.list = d.goals; gs.loaded = true;
+    gs.list = d.goals; gs.loaded = true; goalPersist();
     renderGoals(true);
   } catch (e) {
     if (seq !== gs.seq || !state.user) return;
+    if (e.offline) {
+      const c = await offSafe(offMeta('goals'));
+      if (seq !== gs.seq || !state.user) return;
+      if (c) { gs.list = c; gs.loaded = true; renderGoals(true); return; }
+      $('goalList').replaceChildren(h('p', { class: 'empty', text: 'Belum ada data target di perangkat ini. Buka halaman Target sekali saat online agar bisa dipakai offline.' }));
+      return;
+    }
     if (!gs.loaded) $('goalList').replaceChildren(h('p', { class: 'empty', text: 'Gagal memuat target: ' + e.message }));
   }
 }
 
 /* ---- tombol konfirmasi tekan-dua-kali ---- */
 // Tekan pertama: tombol berubah (hijau/merah) menyebut aksinya dan menghitung mundur 4 detik. Tekan kedua: dijalankan.
-function bindArm(btn, prepare, commit) {
+function bindArm(btn, prepare, commit, after) {
   let timer = 0, armed = false;
-  const reset = () => { armed = false; btn.classList.remove('armed', 'out'); btn.textContent = btn.dataset.label; };
+  const reset = () => { armed = false; btn.classList.remove('armed', 'out', 'commit', 'done'); btn.textContent = btn.dataset.label; };
   const disarm = () => { clearTimeout(timer); timer = 0; if (armed) reset(); };
   btn._disarm = disarm;
   btn.addEventListener('click', async (e) => {
@@ -931,9 +983,20 @@ function bindArm(btn, prepare, commit) {
       timer = setTimeout(disarm, 4000);
       return;
     }
-    clearTimeout(timer); timer = 0; reset();
+    // tekan kedua: tombol "tertekan", disapu cahaya, lalu berubah jadi centang sebelum kembali normal
+    clearTimeout(timer); timer = 0; armed = false;
     btn.disabled = true;
-    try { await commit(); } finally { btn.disabled = false; }
+    btn.classList.remove('armed'); void btn.offsetWidth; btn.classList.add('commit');
+    btn.textContent = 'Memproses…';
+    let res;
+    try { res = await commit(); } catch (er) { res = false; }
+    btn.classList.remove('commit');
+    if (res !== false) {
+      btn.classList.add('done'); btn.textContent = '✓ Berhasil';
+      await new Promise((ok) => setTimeout(ok, reduceMotion() ? 0 : 520));
+    }
+    if (res !== false && after) after(res);
+    reset(); btn.disabled = false;
   });
 }
 function bindMoneyFree(inp, cb) {
@@ -998,15 +1061,17 @@ function prepareNewGoal() {
 }
 async function commitNewGoal() {
   const name = $('gnName').value.trim().replace(/\s+/g, ' '), price = parseAmount($('gnPrice').value);
+  const goal = { id: rid(), name, price, photo: gs.photo || null, status: 'active', createdAt: Date.now(), closedAt: null, saved: 0 };
   try {
-    const d = await goalApi({ action: 'create', name, price, photo: gs.photo });
+    const d = await goalWrite({ op: 'g-create', goal });
+    const g = d && d.goal ? d.goal : goal;
     const at = gs.list.findIndex((x) => x.status === 'done');
-    gs.list.splice(at < 0 ? gs.list.length : at, 0, d.goal);
-    gs.loaded = true;
-    closeSheet('sheetGoalNew');
-    renderGoals(false, d.goal.id);
-  } catch (e) { $('gnErr').textContent = e.message; }
+    gs.list.splice(at < 0 ? gs.list.length : at, 0, g);
+    gs.loaded = true; goalPersist();
+    return g.id;
+  } catch (e) { $('gnErr').textContent = e.message; return false; }
 }
+function afterNewGoal(id) { closeSheet('sheetGoalNew'); renderGoals(false, id); }
 
 /* ---- detail target ---- */
 function burst(host) {
@@ -1055,11 +1120,17 @@ function renderEntries(animate) {
     h('b', { class: e.amount > 0 ? 'in' : 'out', text: (e.amount > 0 ? '+' : '−') + rupiah(Math.abs(e.amount)) }))));
 }
 async function loadEntries(id) {
+  const fromCache = async () => { gs.entries = (await offSafe(offMeta('gent:' + id))) || []; if (gs.openId === id) renderEntries(true); };
   try {
+    if (hasQueue()) { await fromCache(); return; }
     const d = await api('/api/goals?entries=' + encodeURIComponent(id));
     if (gs.openId !== id) return;
-    gs.entries = d.entries; renderEntries(true);
-  } catch (e) { if (gs.openId === id) $('geList').replaceChildren(h('li', { class: 'ge-empty', text: 'Gagal memuat riwayat.' })); }
+    gs.entries = d.entries; renderEntries(true); entPersist(id);
+  } catch (e) {
+    if (gs.openId !== id) return;
+    if (e.offline) await fromCache();
+    else $('geList').replaceChildren(h('li', { class: 'ge-empty', text: 'Gagal memuat riwayat.' }));
+  }
 }
 function setDir(dir) {
   gs.dir = dir;
@@ -1096,62 +1167,95 @@ function prepareEntry() {
 }
 async function commitEntry() {
   const g = curGoal(), a = parseAmount($('geAmt').value), dir = gs.dir;
-  if (!g || a <= 0) return;
+  if (!g || a <= 0) return false;
   const was = gReached(g), from = gPct(g);
+  const signed = dir === 'in' ? a : -a, entryId = rid(), at = Date.now();
   try {
-    const d = await goalApi({ action: 'entry', goalId: g.id, dir, amount: a });
-    g.saved = d.saved;
-    gs.entries.unshift(d.entry);
+    const d = await goalWrite({ op: 'g-entry', goalId: g.id, entryId, dir, amount: a, createdAt: at });
+    g.saved = d && d.saved != null ? d.saved : g.saved + signed;
+    gs.entries.unshift(d && d.entry ? d.entry : { id: entryId, amount: signed, createdAt: at });
+    goalPersist(); entPersist(g.id);
     $('geAmt').value = ''; $('gePrev').textContent = ''; $('geErr').textContent = '';
     paintGoal(g, from);
     renderEntries(false);
     renderGoals(false);
     if (!was && gReached(g)) burst($('gdRing'));
-  } catch (e) { $('geErr').textContent = e.message; }
+    return true;
+  } catch (e) { $('geErr').textContent = e.message; return false; }
 }
+// kartu bergeser keluar lalu ruangnya menciut (dipakai saat target dibeli / dibatalkan)
+function leaveCard(id, dir) {
+  const el = document.querySelector(`.gcard[data-id="${id}"]`);
+  if (!el || reduceMotion() || !el.animate) return Promise.resolve();
+  const hgt = el.offsetHeight;
+  el.style.overflow = 'hidden'; el.style.pointerEvents = 'none';
+  return el.animate([{ transform: 'none' }, { transform: `translateX(${dir * 112}%) scale(.96)` }], { duration: 420, easing: 'cubic-bezier(.5,0,.8,.4)', fill: 'forwards' }).finished
+    .then(() => el.animate([{ height: hgt + 'px', marginBottom: '0px' }, { height: '0px', marginBottom: '-12px', paddingTop: '0px', paddingBottom: '0px', borderWidth: '0px' }], { duration: 300, easing: 'cubic-bezier(.3,.8,.3,1)', fill: 'forwards' }).finished)
+    .catch(() => {});
+}
+const wait = (ms) => new Promise((ok) => setTimeout(ok, reduceMotion() ? 0 : ms));
 async function buyGoal() {
   const g = curGoal();
   if (!g) return;
-  if (!(await ask({ icon: 'check', title: 'Sudah beli barangnya?', ok: 'Ya, sudah beli', text: `${g.name} akan ditandai sudah dibeli dan tabungannya ditutup.` }))) return;
-  if (!(await ask({ icon: 'check', title: 'Tutup tabungan ini?', ok: 'Tutup tabungan', text: 'Setelah ditutup, kamu tidak bisa lagi menambah atau menarik tabungan untuk barang ini.' }))) return;
-  try { await goalApi({ action: 'close', goalId: g.id }); } catch (e) {
+  if (!(await ask({ fx: true, icon: 'check', title: 'Sudah beli barangnya?', ok: 'Ya, sudah beli', text: `${g.name} akan ditandai sudah dibeli dan tabungannya ditutup.` }))) return;
+  if (!(await ask({ fx: true, icon: 'check', title: 'Tutup tabungan ini?', ok: 'Tutup tabungan', text: 'Setelah ditutup, kamu tidak bisa lagi menambah atau menarik tabungan untuk barang ini.' }))) return;
+  try { await goalWrite({ op: 'g-close', goalId: g.id }); } catch (e) {
     await ask({ icon: 'warn', title: 'Gagal menutup tabungan', text: e.message, ok: 'Oke', cancel: null });
     return;
   }
+  closeSheet('sheetGoal');
+  await wait(320);
+  await leaveCard(g.id, 1);
   g.status = 'done'; g.closedAt = Date.now();
   gs.list.sort((a, b) => (a.status === b.status ? (a.status === 'done' ? b.closedAt - a.closedAt : a.createdAt - b.createdAt) : a.status === 'active' ? -1 : 1));
-  closeSheet('sheetGoal');
+  goalPersist();
   renderGoals(false);
 }
 async function cancelGoal() {
   const g = curGoal();
   if (!g) return;
-  if (!(await ask({ icon: 'trash', danger: true, title: 'Batal beli barang ini?', ok: 'Ya, batal beli', text: `Detail ${g.name}, fotonya, dan semua catatan tabungannya akan dihapus.` }))) return;
-  if (!(await ask({ icon: 'trash', danger: true, title: 'Peringatan terakhir', ok: 'Hapus target', text: 'Target dan seluruh catatan tabungannya dihapus permanen dan tidak bisa dikembalikan. Lanjutkan?' }))) return;
-  try { await goalApi({ action: 'remove', goalId: g.id }); } catch (e) {
+  if (!(await ask({ fx: true, icon: 'trash', danger: true, title: 'Batal beli barang ini?', ok: 'Ya, batal beli', text: `Detail ${g.name}, fotonya, dan semua catatan tabungannya akan dihapus.` }))) return;
+  if (!(await ask({ fx: true, icon: 'trash', danger: true, title: 'Peringatan terakhir', ok: 'Hapus target', text: 'Target dan seluruh catatan tabungannya dihapus permanen dan tidak bisa dikembalikan. Lanjutkan?' }))) return;
+  try { await goalWrite({ op: 'g-remove', goalId: g.id }); } catch (e) {
     await ask({ icon: 'warn', title: 'Gagal menghapus target', text: e.message, ok: 'Oke', cancel: null });
     return;
   }
-  gs.list = gs.list.filter((x) => x.id !== g.id);
   closeSheet('sheetGoal');
+  await wait(320);
+  await leaveCard(g.id, -1);
+  gs.list = gs.list.filter((x) => x.id !== g.id);
+  goalPersist(); offSafe(offMeta('gent:' + g.id, null));
   renderGoals(false);
 }
 
-/* ---- pindah halaman: Beranda <-> Target ---- */
+/* ---- pindah halaman: Beranda / Target / Analitik / Chat AI ---- */
+const VIEW_ID = { home: 'app', goals: 'goals', stats: 'stats', chat: 'chat' };
+const VIEW_ORD = ['home', 'goals', 'stats', 'chat'];
 let viewBusy = false;
 function syncNav() {
-  const home = state.view === 'home';
-  $('navHome').classList.toggle('on', home); $('navGoals').classList.toggle('on', !home);
-  if (home) { $('navHome').setAttribute('aria-current', 'page'); $('navGoals').removeAttribute('aria-current'); }
-  else { $('navGoals').setAttribute('aria-current', 'page'); $('navHome').removeAttribute('aria-current'); }
-  $('btnAdd').setAttribute('aria-label', home ? 'Tambah catatan' : 'Tambah target barang');
+  const v = state.view, more = v === 'stats' || v === 'chat';
+  $('navHome').classList.toggle('on', v === 'home'); $('navGoals').classList.toggle('on', v === 'goals'); $('btnMore').classList.toggle('on', more);
+  [['navHome', 'home'], ['navGoals', 'goals']].forEach(([id, k]) => { if (v === k) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current'); });
+  $('btnAdd').setAttribute('aria-label', v === 'goals' ? 'Tambah target barang' : 'Tambah catatan');
+  $('btnAdd').classList.toggle('away', more);
+  $('btnAdd').tabIndex = more ? -1 : 0;
+}
+function setTray(open) {
+  const t = $('tray'), bg = $('trayBg');
+  $('btnMore').setAttribute('aria-expanded', String(open));
+  if (open) { t.hidden = false; bg.hidden = false; void t.offsetWidth; t.classList.add('open'); bg.classList.add('open'); return; }
+  t.classList.remove('open'); bg.classList.remove('open');
+  setTimeout(() => { if (!t.classList.contains('open')) { t.hidden = true; bg.hidden = true; } }, reduceMotion() ? 0 : 320);
 }
 function showView(v) {
+  setTray(false);
   if (state.view === v || viewBusy) return;
-  const from = $(state.view === 'home' ? 'app' : 'goals'), to = $(v === 'home' ? 'app' : 'goals');
-  const dir = v === 'goals' ? 1 : -1;
+  const from = $(VIEW_ID[state.view]), to = $(VIEW_ID[v]);
+  const dir = VIEW_ORD.indexOf(v) > VIEW_ORD.indexOf(state.view) ? 1 : -1;
   state.view = v; syncNav();
   if (v === 'goals') loadGoals();
+  else if (v === 'stats') openStats();
+  else if (v === 'chat') openChat();
   window.scrollTo(0, 0);
   to.hidden = false;
   if (reduceMotion()) { from.hidden = true; return; }
@@ -1169,13 +1273,162 @@ function showView(v) {
 }
 function resetGoalsUI() {
   state.view = 'home'; viewBusy = false;
-  const a = $('app'), g = $('goals');
-  [a, g].forEach((el) => { el.classList.remove('vt'); el.getAnimations().forEach((an) => an.cancel()); });
-  a.hidden = false; g.hidden = true;
+  const all = Object.values(VIEW_ID).map((id) => $(id));
+  all.forEach((el) => { el.classList.remove('vt'); el.getAnimations().forEach((an) => an.cancel()); el.hidden = el.id !== 'app'; });
   gs.list = []; gs.loaded = false; gs.openId = null; gs.entries = []; gs.photo = null; gs.seq++;
   $('goalList').replaceChildren(); $('goalDoneList').replaceChildren(); $('goalDone').hidden = true;
   $('goalDoneBtn').setAttribute('aria-expanded', 'false');
+  stt.y = 0; stt.seq++; $('stBody').replaceChildren();
+  ch.msgs = []; ch.busy = false; ch.seq++; $('chLog').replaceChildren(); $('chIn').value = '';
+  setTray(false);
   syncNav();
+}
+
+/* ================= Analitik (per bulan, dihitung dari catatan di perangkat) ================= */
+const stt = { y: 0, m: 0, seq: 0 };
+const ymOf = (d) => ({ y: d.getFullYear(), m: d.getMonth() });
+const monthKeys = (y, m) => ({ from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 1)}-${pad(new Date(y, m + 1, 0).getDate())}` });
+function shiftMonth(y, m, d) { const x = new Date(y, m + d, 1); return { y: x.getFullYear(), m: x.getMonth() }; }
+function openStats() {
+  if (!stt.y) { const n = ymOf(new Date()); stt.y = n.y; stt.m = n.m; }
+  loadStats();
+}
+function aggMonth(items) {
+  const a = { in: 0, out: 0, n: items.length, cash: 0, bank: 0, none: 0, byDay: new Map(), byDesc: new Map(), weeks: [0, 0, 0, 0, 0], maxIn: null };
+  for (const x of items) {
+    if (x.type === 'in') { a.in += x.amount; if (!a.maxIn || x.amount > a.maxIn.amount) a.maxIn = x; continue; }
+    a.out += x.amount;
+    if (x.method === 'tunai') a.cash += x.amount; else if (x.method === 'nontunai') a.bank += x.amount; else a.none += x.amount;
+    a.byDay.set(x.date, (a.byDay.get(x.date) || 0) + x.amount);
+    const k = (x.desc || '').trim().toLowerCase() || '(tanpa deskripsi)';
+    const e = a.byDesc.get(k) || { name: (x.desc || '').trim() || '(tanpa deskripsi)', sum: 0, n: 0 };
+    e.sum += x.amount; e.n++; a.byDesc.set(k, e);
+    a.weeks[Math.min(4, Math.floor((Number(x.date.slice(8)) - 1) / 7))] += x.amount;
+  }
+  a.net = a.in - a.out;
+  return a;
+}
+const pctTxt = (cur, prev) => (prev === 0 ? (cur === 0 ? '—' : 'baru') : (cur >= prev ? '+' : '−') + Math.round((Math.abs(cur - prev) / prev) * 100) + '%');
+const stRow = (k, v) => h('div', { class: 'strow' }, h('span', { text: k }), h('b', null, v));
+function stBar(label, val, max, cls) {
+  const f = h('div', { class: 'stbar-f ' + cls });
+  requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transform = `scaleX(${max > 0 ? Math.max(val / max, val > 0 ? 0.02 : 0) : 0})`; }));
+  return h('div', { class: 'stbar' }, h('div', { class: 'stbar-h' }, h('span', { text: label }), h('b', { text: rupiah(val) })), h('div', { class: 'stbar-t' }, f));
+}
+async function loadStats() {
+  const seq = ++stt.seq, { y, m } = stt;
+  const now = ymOf(new Date());
+  $('stLabel').textContent = `${MONTHS_LONG[m]} ${y}`;
+  $('stNext').disabled = y > now.y || (y === now.y && m >= now.m);
+  const p = shiftMonth(y, m, -1), k = monthKeys(y, m), kp = monthKeys(p.y, p.m);
+  try {
+    const [cur, prev] = await Promise.all([dbRange(k.from, k.to), dbRange(kp.from, kp.to)]);
+    if (seq !== stt.seq || !state.user) return;
+    drawStats(aggMonth(cur), aggMonth(prev), y, m, p);
+  } catch (e) {
+    if (seq !== stt.seq || !state.user) return;
+    $('stBody').replaceChildren(h('div', { class: 'card stc stempty', text: 'Gagal memuat: ' + e.message }));
+  }
+}
+function drawStats(c, pv, y, m, p) {
+  const body = $('stBody');
+  const isNow = (() => { const n = new Date(); return n.getFullYear() === y && n.getMonth() === m; })();
+  const days = isNow ? new Date().getDate() : new Date(y, m + 1, 0).getDate();
+  const pName = MONTHS_LONG[p.m];
+  if (!c.n) {
+    body.replaceChildren(h('div', { class: 'card stc stempty', text: `Belum ada catatan di ${MONTHS_LONG[m]} ${y}.` + (pv.n ? '' : ' Catatan yang pernah dimuat saat online akan tampil di sini, termasuk saat offline.') }));
+    return;
+  }
+  // --- Ringkasan kondisi keuangan
+  let tone, badge, lead;
+  if (c.in === 0) { tone = 'down'; badge = 'Belum ada penghasilan tercatat'; lead = `Pengeluaran bulan ini ${rupiah(c.out)} tanpa penghasilan yang dicatat.`; }
+  else if (c.net > 0) { tone = 'up'; badge = 'Surplus'; lead = `Penghasilan lebih besar dari pengeluaran. Kamu menyisakan ${rupiah(c.net)}.`; }
+  else if (c.net < 0) { tone = 'down'; badge = 'Defisit'; lead = `Pengeluaran melebihi penghasilan sebesar ${rupiah(-c.net)}.`; }
+  else { tone = 'flat'; badge = 'Impas'; lead = 'Penghasilan dan pengeluaran sama besar.'; }
+  const sum = h('section', { class: 'card stc', style: '--d:0s' }, h('h2', { text: 'Ringkasan kondisi keuangan' }),
+    h('span', { class: 'stbadge ' + tone, text: badge }), h('div', { class: 'stbig ' + (c.net < 0 ? 'c-out' : c.net > 0 ? 'c-inc' : ''), text: (c.net < 0 ? '− ' : c.net > 0 ? '+ ' : '') + rupiah(Math.abs(c.net)) }),
+    h('p', { class: 'stp', text: lead }));
+  if (c.in > 0) {
+    const rate = Math.round((c.net / c.in) * 100);
+    sum.append(h('p', { class: 'stp' }, 'Pengeluaran memakai ', h('b', { text: Math.round((c.out / c.in) * 100) + '%' }), ' dari penghasilan. ',
+      rate >= 20 ? `Rasio sisa ${rate}% tergolong sehat.` : rate >= 0 ? `Rasio sisa ${rate}% masih tipis.` : 'Rasio sisa negatif, perlu perhatian.'));
+  }
+  if (pv.out > 0) sum.append(h('p', { class: 'stp' }, 'Dibanding ', pName, ', pengeluaran ', h('b', { text: c.out >= pv.out ? `naik ${Math.round(((c.out - pv.out) / pv.out) * 100)}%` : `turun ${Math.round(((pv.out - c.out) / pv.out) * 100)}%` }), '.'));
+  // --- Perbandingan pemasukan dan pengeluaran
+  const mx = Math.max(c.in, c.out, pv.in, pv.out, 1);
+  const delta = (lab, cur, prev, goodUp) => h('div', { class: 'strow' }, h('span', { text: lab }),
+    h('b', null, h('span', { class: 'stdelta ' + (cur === prev ? '' : (cur > prev) === goodUp ? 'up' : 'down'), text: pctTxt(cur, prev) }), ` dari ${rupiah(prev)}`));
+  const cmp = h('section', { class: 'card stc', style: '--d:.06s' }, h('h2', { text: 'Perbandingan pemasukan dan pengeluaran' }),
+    h('div', { class: 'stsub', text: `${MONTHS_LONG[m].toUpperCase()}` }),
+    stBar('Pemasukan', c.in, mx, 'in'), stBar('Pengeluaran', c.out, mx, 'out'),
+    h('div', { class: 'stsub', text: pName.toUpperCase() }),
+    stBar('Pemasukan', pv.in, mx, 'mute'), stBar('Pengeluaran', pv.out, mx, 'mute'),
+    h('div', { class: 'stsub', text: `PERUBAHAN DIBANDING ${pName.toUpperCase()}` }),
+    delta('Pemasukan', c.in, pv.in, true), delta('Pengeluaran', c.out, pv.out, false));
+  // --- Laporan bulanan lengkap
+  const topDay = [...c.byDay.entries()].sort((a, b) => b[1] - a[1])[0];
+  const top = [...c.byDesc.values()].sort((a, b) => b.sum - a.sum).slice(0, 5);
+  const rep = h('section', { class: 'card stc', style: '--d:.12s' }, h('h2', { text: 'Laporan bulanan lengkap' }),
+    stRow('Total pemasukan', h('span', { class: 'c-inc', text: rupiah(c.in) })), stRow('Total pengeluaran', h('span', { class: 'c-out', text: rupiah(c.out) })),
+    stRow('Selisih', (c.net < 0 ? '− ' : c.net > 0 ? '+ ' : '') + rupiah(Math.abs(c.net))), stRow('Jumlah catatan', String(c.n)),
+    stRow(isNow ? `Rata-rata pengeluaran per hari (${days} hari)` : 'Rata-rata pengeluaran per hari', rupiah(Math.round(c.out / days))));
+  if (topDay) rep.append(stRow('Hari paling boros', `${fmtLong(topDay[0])} · ${rupiah(topDay[1])}`));
+  if (c.maxIn) rep.append(stRow('Pemasukan terbesar', `${rupiah(c.maxIn.amount)}${c.maxIn.desc ? ' · ' + c.maxIn.desc : ''}`));
+  if (c.out > 0) {
+    rep.append(h('div', { class: 'stsub', text: 'PENGELUARAN TUNAI VS NON TUNAI' }), stBar('Tunai', c.cash, c.out, 'cash'), stBar('Non tunai', c.bank, c.out, 'out'));
+    if (c.none > 0) rep.append(stBar('Metode belum dicatat', c.none, c.out, 'mute'));
+    rep.append(h('div', { class: 'stsub', text: 'PENGELUARAN PER MINGGU' }));
+    const wk = ['Tgl 1–7', 'Tgl 8–14', 'Tgl 15–21', 'Tgl 22–28', 'Tgl 29–akhir'];
+    const wmax = Math.max(...c.weeks, 1);
+    c.weeks.forEach((v, i) => { if (i < 4 || v > 0) rep.append(stBar(wk[i], v, wmax, 'out')); });
+    rep.append(h('div', { class: 'stsub', text: '5 PENGELUARAN TERBESAR' }));
+    top.forEach((e) => rep.append(stRow(e.n > 1 ? `${e.name} (${e.n}×)` : e.name, rupiah(e.sum))));
+  }
+  body.replaceChildren(sum, cmp, rep);
+}
+
+/* ================= Chat AI ================= */
+const CH_SUG = ['Kebiasaan pengeluaran selama satu bulan', 'Perbandingan pengeluaran bulan ini dan sebelumnya', 'Hal yang paling banyak menghabiskan uang', 'Tren pemasukan dan pengeluaran', 'Perkembangan kebiasaan menabung'];
+const ch = { msgs: [], busy: false, seq: 0 };
+function chScroll() { requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: reduceMotion() ? 'auto' : 'smooth' })); }
+function chBubble(m) {
+  if (m.role === 'user') return h('div', { class: 'chb me', text: m.text });
+  const b = h('div', { class: 'chb ai' + (m.role === 'error' ? ' bad' : '') });
+  if (m.role === 'error') b.textContent = m.text; else renderAdvice(b, m.text);
+  return b;
+}
+function chRenderAll() {
+  const log = $('chLog');
+  if (!ch.msgs.length) {
+    log.replaceChildren(h('div', { class: 'chempty' }, h('strong', { text: 'Tanya apa saja soal uangmu' }), 'AI bisa melihat catatan dan tabunganmu, tapi hanya menyebutnya kalau kamu tanya. Pilih contoh di bawah atau ketik sendiri.'));
+    return;
+  }
+  log.replaceChildren(...ch.msgs.map(chBubble));
+}
+function chBusy(on) {
+  ch.busy = on; $('chSend').disabled = on;
+  $('chSug').querySelectorAll('button').forEach((b) => { b.disabled = on; });
+}
+function openChat() {
+  if (!$('chSug').children.length) $('chSug').replaceChildren(...CH_SUG.map((q, i) => h('button', { type: 'button', style: `--d:${i * 0.05}s`, text: q, onclick: () => chSend(q) })));
+  chRenderAll();
+}
+async function chSend(text) {
+  text = String(text || '').trim();
+  if (!text || ch.busy) return;
+  const seq = ch.seq;
+  const first = !ch.msgs.length;
+  ch.msgs.push({ role: 'user', text });
+  if (first) $('chLog').replaceChildren(chBubble(ch.msgs[0])); else $('chLog').append(chBubble(ch.msgs[ch.msgs.length - 1]));
+  $('chIn').value = ''; $('chIn').style.height = '';
+  const typing = h('div', { class: 'chb ai typing', 'aria-label': 'AI sedang mengetik' }, h('i'), h('i'), h('i'));
+  $('chLog').append(typing); chBusy(true); chScroll();
+  const hist = ch.msgs.filter((x) => x.role !== 'error').slice(-12).map((x) => ({ role: x.role, text: x.text }));
+  let msg;
+  try { msg = { role: 'assistant', text: (await api('/api/chat', { messages: hist })).reply }; }
+  catch (e) { msg = { role: 'error', text: e.offline ? 'Chat AI butuh koneksi internet. Coba lagi saat online.' : e.message }; }
+  if (seq !== ch.seq || !state.user) return;
+  typing.remove(); ch.msgs.push(msg); $('chLog').append(chBubble(msg)); chBusy(false); chScroll();
 }
 
 /* ================= Akun & layar awal ================= */
@@ -1683,6 +1936,22 @@ function init() {
   $('btnAdd').addEventListener('click', () => { if (state.view === 'goals') openGoalNew(); else openAdd(); });
   $('navHome').addEventListener('click', () => showView('home'));
   $('navGoals').addEventListener('click', () => showView('goals'));
+  $('btnMore').addEventListener('click', () => setTray($('tray').hidden || !$('tray').classList.contains('open')));
+  $('trayBg').addEventListener('click', () => setTray(false));
+  $('trayStats').addEventListener('click', () => showView('stats'));
+  $('trayChat').addEventListener('click', () => showView('chat'));
+  $('btnDev').addEventListener('click', () => setTray(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('tray').hidden && !$('dlg').classList.contains('open')) setTray(false); });
+  $('stPrev').addEventListener('click', () => { const s = shiftMonth(stt.y, stt.m, -1); stt.y = s.y; stt.m = s.m; loadStats(); });
+  $('stNext').addEventListener('click', () => { const s = shiftMonth(stt.y, stt.m, 1); stt.y = s.y; stt.m = s.m; loadStats(); });
+  $('chForm').addEventListener('submit', (e) => { e.preventDefault(); chSend($('chIn').value); });
+  $('chIn').addEventListener('input', (e) => { const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 96) + 'px'; });
+  $('chIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(pointer:fine)').matches) { e.preventDefault(); chSend($('chIn').value); } });
+  document.querySelectorAll('.meth').forEach((box) => box.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    const k = box.id === 'methOut' ? 'out' : 'in';
+    fm[k] = fm[k] === b.dataset.m && !editing ? '' : b.dataset.m; paintMeth(); setFormError('');
+  }));
   $('goalDoneBtn').addEventListener('click', () => { const b = $('goalDoneBtn'); b.setAttribute('aria-expanded', String(b.getAttribute('aria-expanded') !== 'true')); });
   $('gnPick').addEventListener('click', () => $('gnFile').click());
   $('gnChange').addEventListener('click', () => $('gnFile').click());
@@ -1690,7 +1959,7 @@ function init() {
   $('gnFile').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) pickPhoto(f); });
   bindMoneyFree($('gnPrice'), () => { $('gnErr').textContent = ''; $('gnSave')._disarm(); });
   $('gnName').addEventListener('input', () => { $('gnErr').textContent = ''; $('gnSave')._disarm(); });
-  bindArm($('gnSave'), prepareNewGoal, commitNewGoal);
+  bindArm($('gnSave'), prepareNewGoal, commitNewGoal, afterNewGoal);
   $('formGoal').addEventListener('submit', (e) => e.preventDefault());
   bindMoneyFree($('geAmt'), () => { $('geErr').textContent = ''; $('geSave')._disarm(); updatePreview(); });
   $('geTog').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setDir(b.dataset.dir); $('geErr').textContent = ''; $('geSave')._disarm(); updatePreview(); }));

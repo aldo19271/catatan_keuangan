@@ -49,8 +49,15 @@
 - Catatan yang pernah dimuat saat online tersimpan di perangkat, jadi tetap tampil saat offline. Catatan baru dari perangkat lain tidak muncul sampai online lagi.
 - Catatan yang dibuat, diubah, atau dihapus saat offline disimpan dulu di perangkat dan dikirim otomatis ke database begitu internet kembali. Di Beranda muncul label "Offline" / "n belum tersinkron".
 - Login pertama harus online. Setelah itu aplikasi bisa dibuka offline (sesi berlaku 400 hari). Bila sesi sudah habis, kamu diminta login lagi dan antrean tetap dikirim.
-- Keluar akun butuh internet, dan menghapus data lokal. Target Barang, AI, impor/ekspor, dan kelola akun tetap butuh internet.
+- Target Barang juga bisa offline: daftar target dan riwayat tabungan yang pernah dibuka tersimpan di perangkat. Target baru, nabung/tarik, tutup tabungan, dan batal beli yang dibuat offline dikirim otomatis saat online.
+- Keluar akun butuh internet, dan menghapus data lokal. Chat AI, saran AI, impor/ekspor, dan kelola akun tetap butuh internet. Analitik memakai catatan yang sudah tersimpan di perangkat.
 - Pembungkus APK (WebToNative): pastikan cookie dan penyimpanan lokal tidak dihapus tiap aplikasi ditutup, kalau tidak login offline tidak bertahan.
+
+## Menu Lainnya, Chat AI, dan Analitik
+- Tombol **Lainnya** di pojok kanan footer membuka menu: Chat AI, Analitik, dan Developer.
+- **Chat AI** hanya membahas catatan keuangan dan tabungan akunmu. Server mengambil data akunmu sendiri (ringkasan per bulan, catatan terbaru, target dan riwayat tabungan) dan AI hanya menyebut bagian yang kamu tanya. Memakai `GEMINI_API_KEY` yang sama dengan Beri Saran (tidak ada variabel baru).
+- **Analitik** per bulan: ringkasan kondisi keuangan, perbandingan pemasukan/pengeluaran dengan bulan sebelumnya, dan laporan lengkap (tunai vs non tunai, per minggu, pengeluaran terbesar).
+- Setiap catatan kini punya metode **Tunai** atau **Non Tunai** (catatan lama tetap tanpa metode). Kolom `method` ditambahkan otomatis ke tabel `tx` saat permintaan pertama.
 
 ## Pakai Cal
 

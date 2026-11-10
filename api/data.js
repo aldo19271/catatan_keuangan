@@ -3,7 +3,7 @@
 //   GET  /api/data?advice=YYYY-MM-DD               -> { advice }
 //   GET  /api/data?export=1                        -> { tx, advice }
 //   POST /api/data {action:'add', items}           tambah (dan buang saran hari itu)
-//   POST /api/data {action:'update', id, amount, desc}
+//   POST /api/data {action:'update', id, amount, desc, method?}
 //   POST /api/data {action:'delete', id}
 //   POST /api/data {action:'advice', date, text}   simpan saran
 //   POST /api/data {action:'import', tx, advice}   gabung (id sama ditimpa)
@@ -14,9 +14,10 @@ const A = require('./_auth');
 const MAX_AMOUNT = 999999999999;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_BATCH = 1000;
+const METHODS = ['', 'tunai', 'nontunai'];
 
 const fail = (res, code, msg) => res.status(code).json({ error: msg });
-const toItem = (r) => ({ id: r.id, date: r.date, type: r.type, amount: Number(r.amount), desc: r.descr || '', createdAt: Number(r.created_at) });
+const toItem = (r) => ({ id: r.id, date: r.date, type: r.type, amount: Number(r.amount), desc: r.descr || '', createdAt: Number(r.created_at), method: r.method || '' });
 
 function cleanTx(x) {
   if (!x || typeof x.id !== 'string' || !x.id || x.id.length > 64) return null;
@@ -24,18 +25,18 @@ function cleanTx(x) {
   if (x.type !== 'out' && x.type !== 'in') return null;
   const amount = Math.round(Number(x.amount));
   if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) return null;
-  return { id: x.id, date: x.date, type: x.type, amount, desc: typeof x.desc === 'string' ? x.desc.slice(0, 200) : '', createdAt: Math.max(0, Math.round(Number(x.createdAt) || 0)) };
+  return { id: x.id, date: x.date, type: x.type, amount, desc: typeof x.desc === 'string' ? x.desc.slice(0, 200) : '', createdAt: Math.max(0, Math.round(Number(x.createdAt) || 0)), method: METHODS.includes(x.method) ? x.method : '' };
 }
 function cleanAdvice(a) {
   if (!a || typeof a.date !== 'string' || !DATE_RE.test(a.date) || typeof a.text !== 'string' || !a.text) return null;
   return { date: a.date, text: a.text.slice(0, 4000), createdAt: Math.max(0, Math.round(Number(a.createdAt) || 0)) };
 }
 
-const UPSERT_TX = `INSERT INTO tx (user_id, id, date, type, amount, descr, created_at)
-  SELECT $1::bigint, * FROM unnest($2::text[], $3::text[], $4::text[], $5::bigint[], $6::text[], $7::bigint[])
+const UPSERT_TX = `INSERT INTO tx (user_id, id, date, type, amount, descr, created_at, method)
+  SELECT $1::bigint, * FROM unnest($2::text[], $3::text[], $4::text[], $5::bigint[], $6::text[], $7::bigint[], $8::text[])
   ON CONFLICT (user_id, id) DO UPDATE SET date = EXCLUDED.date, type = EXCLUDED.type, amount = EXCLUDED.amount,
-    descr = EXCLUDED.descr, created_at = EXCLUDED.created_at`;
-const txArgs = (uid, list) => [uid, list.map((t) => t.id), list.map((t) => t.date), list.map((t) => t.type), list.map((t) => t.amount), list.map((t) => t.desc), list.map((t) => t.createdAt)];
+    descr = EXCLUDED.descr, created_at = EXCLUDED.created_at, method = EXCLUDED.method`;
+const txArgs = (uid, list) => [uid, list.map((t) => t.id), list.map((t) => t.date), list.map((t) => t.type), list.map((t) => t.amount), list.map((t) => t.desc), list.map((t) => t.createdAt), list.map((t) => t.method)];
 
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -48,7 +49,7 @@ module.exports = async function handler(req, res) {
       const q = req.query || {};
       if (q.export) {
         const [tx, adv] = await Promise.all([
-          query('SELECT id, date, type, amount, descr, created_at FROM tx WHERE user_id = $1::bigint ORDER BY date, created_at, id', [uid]),
+          query('SELECT id, date, type, amount, descr, created_at, method FROM tx WHERE user_id = $1::bigint ORDER BY date, created_at, id', [uid]),
           query('SELECT date, text, created_at FROM advice WHERE user_id = $1::bigint ORDER BY date', [uid]),
         ]);
         return res.status(200).json({ tx: tx.map(toItem), advice: adv.map((a) => ({ date: a.date, text: a.text, createdAt: Number(a.created_at) })) });
@@ -60,7 +61,7 @@ module.exports = async function handler(req, res) {
       }
       const from = String(q.from || ''), to = String(q.to || '');
       if (!DATE_RE.test(from) || !DATE_RE.test(to)) return fail(res, 400, 'Rentang tanggal tidak valid.');
-      const r = await query('SELECT id, date, type, amount, descr, created_at FROM tx WHERE user_id = $1::bigint AND date >= $2 AND date <= $3 ORDER BY date, created_at, id', [uid, from, to]);
+      const r = await query('SELECT id, date, type, amount, descr, created_at, method FROM tx WHERE user_id = $1::bigint AND date >= $2 AND date <= $3 ORDER BY date, created_at, id', [uid, from, to]);
       return res.status(200).json({ items: r.map(toItem) });
     }
 
@@ -83,10 +84,11 @@ module.exports = async function handler(req, res) {
         const amount = Math.round(Number(body.amount));
         if (typeof body.id !== 'string' || !Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) return fail(res, 400, 'Nominal tidak valid.');
         const desc = typeof body.desc === 'string' ? body.desc.slice(0, 200) : '';
+        const method = METHODS.includes(body.method) ? body.method : null; // null = metode lama dipertahankan
         const r = await query(
-          `WITH u AS (UPDATE tx SET amount = $3::bigint, descr = $4 WHERE user_id = $1::bigint AND id = $2 RETURNING date),
+          `WITH u AS (UPDATE tx SET amount = $3::bigint, descr = $4, method = COALESCE($5::text, method) WHERE user_id = $1::bigint AND id = $2 RETURNING date),
                 d AS (DELETE FROM advice WHERE user_id = $1::bigint AND date IN (SELECT date FROM u) RETURNING 1)
-           SELECT count(*) AS n FROM u`, [uid, body.id, amount, desc]);
+           SELECT count(*) AS n FROM u`, [uid, body.id, amount, desc, method]);
         if (!Number(r[0].n)) return fail(res, 404, 'Catatan tidak ditemukan.');
         return res.status(200).json({ ok: true });
       }
@@ -113,7 +115,7 @@ module.exports = async function handler(req, res) {
         await query(
           `WITH t AS (${UPSERT_TX} RETURNING 1)
            INSERT INTO advice (user_id, date, text, created_at)
-           SELECT $1::bigint, * FROM unnest($8::text[], $9::text[], $10::bigint[])
+           SELECT $1::bigint, * FROM unnest($9::text[], $10::text[], $11::bigint[])
            ON CONFLICT (user_id, date) DO UPDATE SET text = EXCLUDED.text, created_at = EXCLUDED.created_at`,
           [...txArgs(uid, txs), advs.map((a) => a.date), advs.map((a) => a.text), advs.map((a) => a.createdAt)]);
         return res.status(200).json({ ok: true });

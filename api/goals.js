@@ -1,8 +1,8 @@
 // Target barang + tabungan per barang (semua kueri dibatasi user_id sesi).
 //   GET  /api/goals                      -> { goals: [{id,name,price,photo,status,createdAt,closedAt,saved}] }  (aktif + yang sudah terbeli)
 //   GET  /api/goals?entries=<id>         -> { entries: [{id,amount,createdAt}] }  (50 terbaru)
-//   POST /api/goals {action:'create', name, price, photo?}
-//   POST /api/goals {action:'entry', goalId, dir:'in'|'out', amount}   nabung / tarik (saldo tidak boleh minus)
+//   POST /api/goals {action:'create', name, price, photo?, id?, createdAt?}   id/createdAt dari klien (antrean offline, aman dikirim ulang)
+//   POST /api/goals {action:'entry', goalId, dir:'in'|'out', amount, entryId?, createdAt?}   nabung / tarik (saldo tidak boleh minus)
 //   POST /api/goals {action:'close', goalId}    sudah dibeli -> status 'done' (data tetap disimpan)
 //   POST /api/goals {action:'remove', goalId}   batal beli -> semua detail + catatan tabungannya dihapus
 const crypto = require('crypto');
@@ -18,6 +18,10 @@ const PHOTO_RE = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 
 const fail = (res, code, msg) => res.status(code).json({ error: msg });
 const newId = () => crypto.randomBytes(9).toString('hex');
+const ID_RE = /^[a-z0-9]{8,32}$/;
+// id dan waktu boleh dikirim klien (antrean offline): kirim ulang dengan id sama tidak menggandakan data
+const pickId = (v) => (typeof v === 'string' && ID_RE.test(v) ? v : newId());
+const pickTime = (v, now) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > now - 400 * 864e5 && n <= now + 6e4 ? n : now; };
 const toGoal = (r) => ({
   id: r.id, name: r.name, price: Number(r.price), photo: r.photo || null, status: r.status,
   createdAt: Number(r.created_at), closedAt: r.closed_at == null ? null : Number(r.closed_at), saved: Number(r.saved),
@@ -72,13 +76,15 @@ module.exports = async function handler(req, res) {
           photo = body.photo;
         }
         // batas jumlah target aktif dicek di pernyataan yang sama dengan insert
+        const gid = pickId(body.id);
         const r = await query(
           `INSERT INTO goals (user_id, id, name, price, photo, status, created_at)
            SELECT $1::bigint, $2, $3, $4::bigint, $5, 'active', $6::bigint
            WHERE (SELECT COUNT(*) FROM goals WHERE user_id = $1::bigint AND status = 'active') < ${MAX_ACTIVE}
-           RETURNING id`, [uid, newId(), name, price, photo, now]);
-        if (!r.length) return fail(res, 400, `Maksimal ${MAX_ACTIVE} target aktif. Tutup atau batalkan salah satu dulu.`);
-        const g = await query(SELECT_GOALS + ' AND g.id = $2', [uid, r[0].id]);
+           ON CONFLICT (user_id, id) DO NOTHING
+           RETURNING id`, [uid, gid, name, price, photo, pickTime(body.createdAt, now)]);
+        const g = await query(SELECT_GOALS + ' AND g.id = $2', [uid, gid]);
+        if (!r.length && !g.length) return fail(res, 400, `Maksimal ${MAX_ACTIVE} target aktif. Tutup atau batalkan salah satu dulu.`);
         return res.status(200).json({ goal: toGoal(g[0]) });
       }
 
@@ -89,7 +95,7 @@ module.exports = async function handler(req, res) {
         if (!Number.isFinite(amount) || amount <= 0) return fail(res, 400, 'Masukkan nominal lebih dari 0.');
         if (amount > MAX_AMOUNT) return fail(res, 400, 'Nominal terlalu besar.');
         const signed = body.dir === 'in' ? amount : -amount;
-        const eid = newId();
+        const eid = pickId(body.entryId), at = pickTime(body.createdAt, now);
         // satu pernyataan: target harus aktif, saldo tidak boleh minus, dan jumlah catatan dibatasi
         const r = await query(
           `WITH g AS (SELECT 1 FROM goals WHERE user_id = $1::bigint AND id = $2 AND status = 'active'),
@@ -97,15 +103,18 @@ module.exports = async function handler(req, res) {
            INSERT INTO goal_entries (user_id, goal_id, id, amount, created_at)
            SELECT $1::bigint, $2, $3, $4::bigint, $5::bigint FROM g, s
            WHERE s.t + $4::bigint >= 0 AND s.t + $4::bigint <= ${MAX_AMOUNT} AND s.n < ${MAX_ENTRIES}
-           RETURNING id`, [uid, goalId, eid, signed, now]);
+           ON CONFLICT (user_id, id) DO NOTHING
+           RETURNING id`, [uid, goalId, eid, signed, at]);
         const cur = await query(SELECT_GOALS + ' AND g.id = $2', [uid, goalId]);
+        const dup = !r.length ? await query('SELECT 1 FROM goal_entries WHERE user_id = $1::bigint AND id = $2 AND goal_id = $3', [uid, eid, goalId]) : [];
+        if (dup.length) return res.status(200).json({ saved: Number(cur[0].saved), entry: { id: eid, amount: signed, createdAt: at } });
         if (!r.length) {
           if (!cur.length || cur[0].status !== 'active') return fail(res, 404, 'Target tidak ditemukan atau sudah ditutup.');
           const saved = Number(cur[0].saved);
           if (signed < 0 && saved + signed < 0) return fail(res, 400, 'Nominal melebihi tabungan yang ada.');
           return fail(res, 400, 'Catatan tabungan sudah mencapai batas.');
         }
-        return res.status(200).json({ saved: Number(cur[0].saved), entry: { id: eid, amount: signed, createdAt: now } });
+        return res.status(200).json({ saved: Number(cur[0].saved), entry: { id: eid, amount: signed, createdAt: at } });
       }
 
       case 'close': {

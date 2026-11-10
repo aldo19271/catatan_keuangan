@@ -47,6 +47,8 @@ const SCHEMA = [
      PRIMARY KEY (user_id, id)
    )`,
   `CREATE INDEX IF NOT EXISTS tx_user_date_idx ON tx (user_id, date)`,
+  // metode pembayaran: 'tunai' | 'nontunai' | '' (catatan lama belum dipilih)
+  `ALTER TABLE tx ADD COLUMN IF NOT EXISTS method TEXT NOT NULL DEFAULT ''`,
   // target barang: satu baris per target; saldo tabungan = jumlah goal_entries (positif = nabung, negatif = tarik)
   `CREATE TABLE IF NOT EXISTS goals (
      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
