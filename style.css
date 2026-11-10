@@ -668,3 +668,22 @@ body.gated #stats,body.gated #chat{visibility:hidden}
 .dlg.hit .dlg-yes{animation:dlgHit .24s cubic-bezier(.3,1.6,.5,1)}
 .dlg.hit .dlg-ic{animation:dlgPop .24s cubic-bezier(.3,1.6,.5,1)}
 @keyframes dlgHit{0%{transform:scale(1)}40%{transform:scale(.92)}100%{transform:scale(1.04)}}
+
+/* ===== Diagram lingkaran (Analitik) ===== */
+.dn{display:flex;align-items:center;gap:16px;margin-bottom:6px}
+.dn-ring{position:relative;flex:none;width:132px;height:132px}
+.dn-svg{width:100%;height:100%;transform:rotate(-90deg);animation:dnSpin 1s cubic-bezier(.2,.8,.2,1)}
+@keyframes dnSpin{from{transform:rotate(-200deg) scale(.86)}}
+.dn-svg circle{fill:none;stroke-width:16}
+.dn-bg{stroke:var(--s2)}
+.dn-seg{stroke-linecap:butt;transition:stroke-dasharray 1s cubic-bezier(.2,.8,.2,1)}
+.dn-seg.in{stroke:var(--grn)}
+.dn-seg.out{stroke:var(--or);transition-delay:.25s}
+.dn-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:stIn .7s .3s cubic-bezier(.2,.8,.2,1) backwards}
+.dn-mid b{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.dn-mid span{font-size:.68rem;color:var(--mu)}
+.dn-key{flex:1;min-width:0;display:grid;gap:10px}
+.dn-leg{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;font-size:.8rem;color:var(--mu)}
+.dn-leg i{width:10px;height:10px;border-radius:50%;background:var(--grn)}
+.dn-leg i.out{background:var(--or)}
+.dn-leg b{grid-column:2;color:var(--tx);font-weight:650;font-size:.84rem;overflow-wrap:anywhere}

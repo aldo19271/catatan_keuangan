@@ -1310,6 +1310,23 @@ function aggMonth(items) {
 }
 const pctTxt = (cur, prev) => (prev === 0 ? (cur === 0 ? '—' : 'baru') : (cur >= prev ? '+' : '−') + Math.round((Math.abs(cur - prev) / prev) * 100) + '%');
 const stRow = (k, v) => h('div', { class: 'strow' }, h('span', { text: k }), h('b', null, v));
+// diagram lingkaran pemasukan vs pengeluaran; busur tumbuh saat dimuat
+function stDonut(inc, out) {
+  const tot = inc + out, C = 2 * Math.PI * 52;
+  const lenIn = C * (inc / tot), lenOut = C - lenIn, pOut = Math.round((out / tot) * 100);
+  const mk = (cls, off) => { const c = s('circle', { cx: 70, cy: 70, r: 52, class: 'dn-seg ' + cls, 'stroke-dasharray': `0 ${C}`, 'stroke-dashoffset': String(off) }); return c; };
+  const cIn = mk('in', 0), cOut = mk('out', -lenIn);
+  const svg = s('svg', { viewBox: '0 0 140 140', class: 'dn-svg', role: 'img', 'aria-label': `Pemasukan ${100 - pOut}%, pengeluaran ${pOut}%` });
+  svg.append(s('circle', { cx: 70, cy: 70, r: 52, class: 'dn-bg' }), cIn, cOut);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    cIn.setAttribute('stroke-dasharray', `${Math.max(lenIn - (inc && out ? 2 : 0), 0)} ${C}`);
+    cOut.setAttribute('stroke-dasharray', `${Math.max(lenOut - (inc && out ? 2 : 0), 0)} ${C}`);
+  }));
+  const mid = h('div', { class: 'dn-mid' }, h('b', { text: pOut + '%' }), h('span', { text: 'pengeluaran' }));
+  const leg = (cls, lab, v, pc) => h('div', { class: 'dn-leg' }, h('i', { class: cls }), h('span', { text: lab }), h('b', { text: `${rupiah(v)} · ${pc}%` }));
+  return h('div', { class: 'dn' }, h('div', { class: 'dn-ring' }, svg, mid),
+    h('div', { class: 'dn-key' }, leg('in', 'Pemasukan', inc, 100 - pOut), leg('out', 'Pengeluaran', out, pOut)));
+}
 function stBar(label, val, max, cls) {
   const f = h('div', { class: 'stbar-f ' + cls });
   requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transform = `scaleX(${max > 0 ? Math.max(val / max, val > 0 ? 0.02 : 0) : 0})`; }));
@@ -1359,6 +1376,7 @@ function drawStats(c, pv, y, m, p) {
   const delta = (lab, cur, prev, goodUp) => h('div', { class: 'strow' }, h('span', { text: lab }),
     h('b', null, h('span', { class: 'stdelta ' + (cur === prev ? '' : (cur > prev) === goodUp ? 'up' : 'down'), text: pctTxt(cur, prev) }), ` dari ${rupiah(prev)}`));
   const cmp = h('section', { class: 'card stc', style: '--d:.06s' }, h('h2', { text: 'Perbandingan pemasukan dan pengeluaran' }),
+    c.in + c.out > 0 && stDonut(c.in, c.out),
     h('div', { class: 'stsub', text: `${MONTHS_LONG[m].toUpperCase()}` }),
     stBar('Pemasukan', c.in, mx, 'in'), stBar('Pengeluaran', c.out, mx, 'out'),
     h('div', { class: 'stsub', text: pName.toUpperCase() }),
