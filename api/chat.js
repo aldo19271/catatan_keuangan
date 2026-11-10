@@ -119,7 +119,7 @@ module.exports = async function handler(req, res) {
       const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
       const text = Array.isArray(parts) ? parts.map((p) => p.text || '').join('').trim() : '';
       if (!text) return res.status(502).json({ error: 'AI tidak memberi jawaban. Coba lagi.' });
-      return res.status(200).json({ reply: text.slice(0, 4000) });
+      return res.status(200).json({ reply: text.replace(/\u2014/g, '-').slice(0, 4000) });
     } finally { clearTimeout(timer); }
   } catch (e) {
     const timeout = e && e.name === 'AbortError';

@@ -1308,7 +1308,7 @@ function aggMonth(items) {
   a.net = a.in - a.out;
   return a;
 }
-const pctTxt = (cur, prev) => (prev === 0 ? (cur === 0 ? '—' : 'baru') : (cur >= prev ? '+' : '−') + Math.round((Math.abs(cur - prev) / prev) * 100) + '%');
+const pctTxt = (cur, prev) => (prev === 0 ? (cur === 0 ? '-' : 'baru') : (cur >= prev ? '+' : '−') + Math.round((Math.abs(cur - prev) / prev) * 100) + '%');
 const stRow = (k, v) => h('div', { class: 'strow' }, h('span', { text: k }), h('b', null, v));
 // diagram lingkaran pemasukan vs pengeluaran; busur tumbuh saat dimuat
 function stDonut(inc, out) {
