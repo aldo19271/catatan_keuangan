@@ -40,7 +40,7 @@
 <p align="center">
   <img src="docs/readme/tour.png" alt="Empat layar Cal: beranda dengan grafik dan kalender, analisis bulanan, form catatan, dan hasil Beri Saran" width="100%">
 </p>
-<p align="center"><sub>Tampilan asli aplikasi dengan data contoh. Isi saran AI di gambar hanyalah contoh.</sub></p>
+<p align="center"><sub>Tampilan asli aplikasi dengan data contoh.</sub></p>
 
 ## Mode offline (catatan harian)
 - Catatan yang pernah dimuat saat online tersimpan di perangkat, jadi tetap tampil saat offline. Catatan baru dari perangkat lain tidak muncul sampai online lagi.
