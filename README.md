@@ -10,14 +10,11 @@
 </p>
 
 <p align="center">
-  <img alt="PWA" src="https://img.shields.io/badge/PWA-bisa_dipasang-000?style=for-the-badge&logo=pwa&logoColor=white">
   <img alt="Tema gelap" src="https://img.shields.io/badge/tema-gelap_oranye-000?style=for-the-badge&labelColor=1c1c1e&color=ff7a1a">
   <img alt="Gemini" src="https://img.shields.io/badge/Model_AI-Gemini-000?style=for-the-badge&logo=googlegemini&logoColor=white">
   <img alt="Vercel" src="https://img.shields.io/badge/deploy-Vercel-000?style=for-the-badge&logo=vercel&logoColor=white">
   <a href="https://instagram.com/apap09_"><img alt="Instagram" src="https://img.shields.io/badge/instagram-apap09__-000?style=for-the-badge&logo=instagram&logoColor=white"></a>
 </p>
-
-> **Cal adalah proyek pribadi** yang dibuat untuk dipakai sendiri. Datanya disimpan di akun masing-masing (database Neon), dan saran AI memakai API key Gemini gratis. Dukungan bersifat sebisanya (best-effort).
 
 <br>
 
@@ -60,34 +57,10 @@
 - Setiap catatan kini punya metode **Tunai** atau **Non Tunai** (catatan lama tetap tanpa metode). Kolom `method` ditambahkan otomatis ke tabel `tx` saat permintaan pertama.
 
 ## Pakai Cal
-
 1. Buka link Cal di browser HP, tekan **Selanjutnya**, lalu **Daftar** (Gmail, username, password). Berikutnya cukup **Login**; setelah itu Cal langsung terbuka sampai kamu **Logout** (Pengaturan, ikon gerigi).
 2. Menu browser → **Tambahkan ke layar utama** (Chrome Android) atau **Bagikan → Tambah ke Layar Utama** (Safari iPhone).
 3. Tekan **+** di tengah bawah untuk mencatat, lalu pilih Pengeluaran atau Penghasilan. Tekan sebuah hari di kalender untuk melihat rinciannya, atau pakai tombol **Tahun / Bulan / Minggu** di bawah grafik untuk mengganti periode analisis.
 4. Besoknya, tekan hari kemarin lalu **Beri Saran**.
-
-## Deploy sendiri
-
-hanya butuh GitHub, Vercel, dan database [Neon](https://neon.com) (gratis), tanpa build command.
-
-1. Unggah semua file proyek ke repository GitHub (folder `api/`, `icons/`, dan `docs/` ikut).
-2. Di Vercel: **Add New → Project** → pilih repository → **Deploy**. Framework Preset: *Other*.
-3. Buat database Neon: di Vercel buka **Storage → Create Database → Neon** dan hubungkan ke project ini. Variabel `DATABASE_URL` otomatis ditambahkan. (Cara manual: buat project di [neon.com](https://neon.com), salin *connection string* yang **pooled**, lalu simpan sebagai `DATABASE_URL`.) Tabel dibuat otomatis saat aplikasi pertama dipakai, tidak perlu menjalankan SQL.
-4. Di **Settings → Environment Variables**, pastikan ada:
-
-   | Nama | Isi |
-   |---|---|
-   | `DATABASE_URL` | *connection string* Neon (otomatis bila memakai integrasi Vercel) |
-   | `GEMINI_API_KEY` | API key dari [Google AI Studio](https://aistudio.google.com/) |
-   | `GEMINI_MODEL` | *(opsional)* default `gemini-3.5-flash-lite` |
-   | `GMAIL_USER` | alamat Gmail pengirim kode lupa password, mis. `calapp@gmail.com` (sebaiknya Gmail khusus) |
-   | `GMAIL_APP_PASSWORD` | *App Password* 16 huruf dari akun Google itu |
-   | `MAIL_FROM_NAME` | *(opsional)* nama pengirim yang tampil di email, default `Cal` |
-
-   **Membuat App Password Gmail:** masuk ke akun Gmail pengirim → [myaccount.google.com/security](https://myaccount.google.com/security) → aktifkan **Verifikasi 2 Langkah** → cari **App passwords** (Sandi aplikasi) → buat satu bernama "Cal" → salin 16 hurufnya ke `GMAIL_APP_PASSWORD`. Batas kirim Gmail sekitar 500 email per hari.
-
-5. **Redeploy** agar variabel terbaca.
-6. Ganti link GitHub di halaman Developer: buka `index.html`, cari komentar `GANTI link repo`, lalu ubah `href` di bawahnya ke repo-mu.
 
 ## Cara kerja
 
@@ -135,7 +108,7 @@ vercel.json  package.json
 - **Hosting:** [Vercel](https://vercel.com).
 - **Live Website:** [Open](https://catatankeuangan-orpin.vercel.app/).
 - **Font:** font sistem perangkat, tanpa unduhan tambahan.
-
+- **Thanks2:** [median.co](https://median.co) and [Acode](https://acode.app)
 ## Developer
 
 <p>
