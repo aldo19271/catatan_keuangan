@@ -108,7 +108,7 @@ vercel.json  package.json
 - **Hosting:** [Vercel](https://vercel.com).
 - **Live Website:** [Open](https://catatankeuangan-orpin.vercel.app/).
 - **Font:** font sistem perangkat, tanpa unduhan tambahan.
-- **Thanks2:** [median.co](https://median.co) and [Acode](https://acode.app)
+- **Thanks2:** [median.co](https://median.co), [Acode](https://acode.app) and [Claude](https://claude.ai)
 ## Developer
 
 <p>
