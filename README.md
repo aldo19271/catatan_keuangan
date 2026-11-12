@@ -117,3 +117,4 @@ vercel.json  package.json
 </p>
 
 <sub>Cal tidak berafiliasi dengan Google atau Vercel. Gemini adalah merek dagang Google LLC. Vercel adalah merek dagang Vercel Inc. Saran AI bersifat informatif dan bukan nasihat keuangan profesional.</sub>
+<sub>Open Source Project</sub>
