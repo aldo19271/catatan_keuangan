@@ -57,7 +57,7 @@
 - Setiap catatan kini punya metode **Tunai** atau **Non Tunai** (catatan lama tetap tanpa metode). Kolom `method` ditambahkan otomatis ke tabel `tx` saat permintaan pertama.
 
 ## Tema Doodle Gelap
-- Tampilan digambar tangan di atas dasar gelap: garis bergelombang, bayangan pensil, font Patrick Hand dan Caveat Brush (disimpan di folder `fonts/`, lisensi OFL).
+- Tampilan digambar tangan di atas dasar gelap: garis bergelombang, bayangan pensil, font Child Hood (cadangan Patrick Hand untuk simbol yang tidak ada di Child Hood) (disimpan di folder `fonts/`).
 - `doodle.css` adalah lapisan tema yang dimuat setelah `style.css`. Warna dan bentuk ada di bagian `:root` paling atas file itu.
 - `doodle.js` berisi gerak: pegas saat tombol ditekan, catatan melompat masuk, garis grafik bergetar seperti digambar tangan, coretan yang digambar di bawah judul, dan hiasan melayang di latar.
 

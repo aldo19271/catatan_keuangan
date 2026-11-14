@@ -4,14 +4,14 @@
    bentuk (garis tangan), bayangan, dan gerak. Tata letak tidak diubah.
    =================================================================== */
 @font-face{font-family:"Patrick Hand";src:url(/fonts/patrick.woff) format("woff");font-display:swap}
-@font-face{font-family:"Caveat Brush";src:url(/fonts/caveatbrush.woff) format("woff");font-display:swap}
+@font-face{font-family:"Child Hood";src:url(/fonts/childhood.woff) format("woff");font-display:swap}
 
 :root{
   --bg:#14141b; --s1:#1d1d28; --s2:#272735; --line:#4b4b60; --ink:#efe9dc;
   --or:#ff8a2b; --or2:#ffb066; --tx:#f1ecdf; --mu:#aeabc0;
   --red:#ff6b6b; --grn:#5ee6a8; --yel:#ffd84d; --pink:#ff8fc3; --blu:#7cc4ff;
-  --hand:"Patrick Hand","Segoe Print","Comic Sans MS",cursive,system-ui,sans-serif;
-  --brush:"Caveat Brush","Segoe Print","Comic Sans MS",cursive,system-ui,sans-serif;
+  --hand:"Child Hood","Patrick Hand","Segoe Print","Comic Sans MS",cursive,system-ui,sans-serif;
+  --brush:"Child Hood","Patrick Hand","Segoe Print","Comic Sans MS",cursive,system-ui,sans-serif;
   /* bentuk bergelombang ala gambar tangan */
   --w1:255px 14px 225px 14px/14px 225px 14px 255px;
   --w2:14px 225px 14px 255px/225px 14px 255px 14px;
@@ -23,7 +23,7 @@
   --spr:linear(0, 0.06, 0.212, 0.413, 0.626, 0.824, 0.988, 1.109, 1.184, 1.218, 1.217, 1.192, 1.151, 1.105, 1.059, 1.019, 0.987, 0.966, 0.954, 0.951, 0.954, 0.962, 0.972, 0.982, 0.992, 1, 1.006, 1.009, 1.011, 1.011, 1.009, 1.007, 1.005, 1.003, 1.001, 0.999, 0.998, 0.998, 0.998, 0.998, 1);
   --smooth:linear(0, 0.02, 0.069, 0.136, 0.211, 0.289, 0.367, 0.441, 0.51, 0.573, 0.63, 0.681, 0.726, 0.765, 0.8, 0.829, 0.855, 0.877, 0.896, 0.913, 0.926, 0.938, 0.948, 0.957, 0.964, 0.97, 0.975, 0.979, 0.982, 0.985, 0.988, 0.99, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 1);
 }
-html,body{background-color:var(--bg);font-family:var(--hand);font-size:17px;letter-spacing:.01em}
+html,body{background-color:var(--bg);font-family:var(--hand);font-size:18.5px;letter-spacing:.015em;font-synthesis:none}
 body{background-image:radial-gradient(rgba(241,236,223,.10) 1.3px,transparent 1.6px);background-size:24px 24px;background-attachment:fixed}
 h1,h2,.wordmark,.g-title,.stbig,.tray-t b,.dlg-card h3,.gd-pct,.chempty strong{font-family:var(--brush);font-weight:400;letter-spacing:.02em}
 .top h1,.gtop h1{font-size:1.9rem;line-height:1.05;font-weight:400;margin-top:8px}
@@ -55,7 +55,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2.5px da
 .chart .grid{stroke:var(--line);stroke-dasharray:3 6;stroke-linecap:round}
 .chart .ln,.chart .dot{filter:url(#rough)}
 .chart .ln{stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
-.chart text,#heroSvg text{font-family:var(--hand);font-size:11px}
+.chart text,#heroSvg text{font-family:var(--hand);font-size:13px}
 .legend span,.sw{font-family:var(--hand)}
 .seg{background:var(--s2);border:2px solid var(--ink);border-radius:var(--w3);padding:3px}
 .seg button{font-family:var(--hand);font-size:.95rem}
