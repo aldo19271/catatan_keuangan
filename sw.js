@@ -1,4 +1,4 @@
-const CACHE = 'cal-v13';
+const CACHE = 'cal-v14';
 const SHELL = ['/', '/index.html', '/style.css', '/doodle.css', '/app.js', '/doodle.js', '/fonts/patrick.woff', '/fonts/childhood.woff', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

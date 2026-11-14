@@ -139,7 +139,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2.5px da
 .dlg-card{background:var(--s1);border:2.5px solid var(--ink);border-radius:var(--w1);box-shadow:6px 7px 0 rgba(0,0,0,.6)}
 .dlg-card h3{font-size:1.7rem}
 .dlg-ic{border:2.5px solid var(--ink);border-radius:var(--w4);background:var(--yel);color:#1a1a22}
-.dlg.danger .dlg-ic{background:var(--red)}
+.dlg.danger .dlg-ic{background:var(--red);color:#1a1a22}
 .dlg-grip{display:none}
 
 /* ---------- isian ---------- */
