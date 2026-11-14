@@ -1,0 +1,238 @@
+/* ===================================================================
+   TEMA DOODLE GELAP untuk Cal
+   Lapisan ini dimuat setelah style.css: hanya mengganti warna, huruf,
+   bentuk (garis tangan), bayangan, dan gerak. Tata letak tidak diubah.
+   =================================================================== */
+@font-face{font-family:"Patrick Hand";src:url(/fonts/patrick.woff) format("woff");font-display:swap}
+@font-face{font-family:"Caveat Brush";src:url(/fonts/caveatbrush.woff) format("woff");font-display:swap}
+
+:root{
+  --bg:#14141b; --s1:#1d1d28; --s2:#272735; --line:#4b4b60; --ink:#efe9dc;
+  --or:#ff8a2b; --or2:#ffb066; --tx:#f1ecdf; --mu:#aeabc0;
+  --red:#ff6b6b; --grn:#5ee6a8; --yel:#ffd84d; --pink:#ff8fc3; --blu:#7cc4ff;
+  --hand:"Patrick Hand","Segoe Print","Comic Sans MS",cursive,system-ui,sans-serif;
+  --brush:"Caveat Brush","Segoe Print","Comic Sans MS",cursive,system-ui,sans-serif;
+  /* bentuk bergelombang ala gambar tangan */
+  --w1:255px 14px 225px 14px/14px 225px 14px 255px;
+  --w2:14px 225px 14px 255px/225px 14px 255px 14px;
+  --w3:18px 12px 20px 10px/11px 20px 12px 18px;
+  --w4:12px 20px 10px 18px/20px 11px 18px 12px;
+  --r:18px;
+  --pencil:3px 4px 0 rgba(0,0,0,.55);
+  /* gerak pegas (setara spring Framer Motion) */
+  --spr:linear(0, 0.06, 0.212, 0.413, 0.626, 0.824, 0.988, 1.109, 1.184, 1.218, 1.217, 1.192, 1.151, 1.105, 1.059, 1.019, 0.987, 0.966, 0.954, 0.951, 0.954, 0.962, 0.972, 0.982, 0.992, 1, 1.006, 1.009, 1.011, 1.011, 1.009, 1.007, 1.005, 1.003, 1.001, 0.999, 0.998, 0.998, 0.998, 0.998, 1);
+  --smooth:linear(0, 0.02, 0.069, 0.136, 0.211, 0.289, 0.367, 0.441, 0.51, 0.573, 0.63, 0.681, 0.726, 0.765, 0.8, 0.829, 0.855, 0.877, 0.896, 0.913, 0.926, 0.938, 0.948, 0.957, 0.964, 0.97, 0.975, 0.979, 0.982, 0.985, 0.988, 0.99, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 1);
+}
+html,body{background-color:var(--bg);font-family:var(--hand);font-size:17px;letter-spacing:.01em}
+body{background-image:radial-gradient(rgba(241,236,223,.10) 1.3px,transparent 1.6px);background-size:24px 24px;background-attachment:fixed}
+h1,h2,.wordmark,.g-title,.stbig,.tray-t b,.dlg-card h3,.gd-pct,.chempty strong{font-family:var(--brush);font-weight:400;letter-spacing:.02em}
+.top h1,.gtop h1{font-size:1.9rem;line-height:1.05;font-weight:400;margin-top:8px}
+.g-title{letter-spacing:.01em;line-height:1.04;font-weight:400}
+input,textarea,button,select{font-family:var(--hand)}
+::selection{background:var(--yel);color:#1a1a22}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2.5px dashed var(--yel);outline-offset:3px}
+
+/* lapisan hiasan doodle di belakang halaman */
+.doodle-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.doodle-bg svg{position:absolute;overflow:visible;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:.5}
+.scrb{display:block;height:12px;width:132px;margin-top:2px;overflow:visible}
+.scrb path{fill:none;stroke:var(--or);stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- kartu & permukaan ---------- */
+.card,.stc{background:var(--s1);border:2px solid var(--ink);border-radius:var(--w1);box-shadow:var(--pencil)}
+.stc:nth-child(even),.card.alt2{border-radius:var(--w2)}
+.top{padding:16px 16px 16px}
+.logo{border:2.5px solid var(--ink);border-radius:var(--w3);background:var(--or);color:#1a1a22;font-family:var(--brush);font-weight:400;
+  box-shadow:2px 3px 0 rgba(0,0,0,.6);transform:rotate(-5deg);transition:transform .5s var(--spr)}
+.logo:hover{transform:rotate(4deg) scale(1.08)}
+.wordmark{font-size:1.7rem}
+.icon-btn{border-radius:var(--w3);color:var(--ink);border:2px dashed transparent;transition:transform .5s var(--spr),border-color .2s,background .2s}
+.icon-btn:active{background:var(--s2);border-color:var(--line);transform:scale(.9) rotate(-4deg)}
+.badge,.mtag,.net-chip,.stbadge{border-radius:var(--w4);border:1.8px solid var(--ink);font-family:var(--hand)}
+.net-chip{background:var(--yel);color:#1a1a22;border-color:var(--ink);font-weight:400;font-size:.8rem}
+
+/* ---------- grafik ---------- */
+.chart .grid{stroke:var(--line);stroke-dasharray:3 6;stroke-linecap:round}
+.chart .ln,.chart .dot{filter:url(#rough)}
+.chart .ln{stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.chart text,#heroSvg text{font-family:var(--hand);font-size:11px}
+.legend span,.sw{font-family:var(--hand)}
+.seg{background:var(--s2);border:2px solid var(--ink);border-radius:var(--w3);padding:3px}
+.seg button{font-family:var(--hand);font-size:.95rem}
+.seg .pill{border-radius:var(--w4);background:var(--or);border:2px solid var(--ink)}
+.seg button[aria-pressed="true"]{color:#1a1a22}
+
+/* ---------- minggu & hari ---------- */
+.week-nav span,.pnav span{font-family:var(--brush);font-size:1.2rem;letter-spacing:.02em}
+.days{gap:6px}
+.day{background:var(--s1);border:2px solid var(--ink);border-radius:var(--w3);box-shadow:2px 3px 0 rgba(0,0,0,.55);
+  transition:transform .55s var(--spr),background .2s,box-shadow .2s}
+.day:nth-child(odd){rotate:-1.6deg}.day:nth-child(even){rotate:1.4deg}.day:nth-child(3n){border-radius:var(--w4)}
+.day:active{transform:scale(.9)}
+.day .dn{font-family:var(--hand)}.day .dd{font-family:var(--brush);font-size:1.25rem}
+.day.today{border-style:dashed;border-color:var(--yel)}
+.day.sel{background:var(--or);border:2px solid var(--ink);color:#1a1a22;box-shadow:3px 4px 0 var(--ink);transform:translateY(-3px) scale(1.06)}
+.day .dots i{border:1.5px solid var(--ink);width:7px;height:7px}
+.day .dots i{background:var(--grn)}.day .dots i.o{background:var(--red)}
+
+/* ---------- ringkasan & daftar catatan ---------- */
+.totals,.d-sum .stat{font-family:var(--hand)}
+.totals strong,.stat strong{font-family:var(--brush);font-weight:400;letter-spacing:.02em;font-size:1.25em}
+.detail{background:transparent}
+.d-head h2{font-size:1.5rem}
+.tx{background:var(--s2);border:2px solid var(--ink);border-radius:var(--w3);box-shadow:var(--pencil);overflow:hidden}
+.tx:nth-child(even){border-radius:var(--w4)}
+.tx::before{width:9px;background:var(--grn);border-right:2px solid var(--ink)}
+.tx.out::before{background:var(--red)}
+.tx-main .a{font-family:var(--brush);font-weight:400;font-size:1.15rem;letter-spacing:.02em}
+.tx-del{border-radius:var(--w3)}
+.empty{font-family:var(--hand);color:var(--mu);border:2px dashed var(--line);border-radius:var(--w1);padding:18px 14px}
+
+/* ---------- tombol ---------- */
+.btn-primary,.btn-saran,.go,.gbtn-buy,.btn-danger.solid,.chsend,.dlg-yes{
+  font-family:var(--brush);font-weight:400;letter-spacing:.03em;font-size:1.2rem;color:#1a1a22;
+  background:var(--or);border:2.5px solid var(--ink);border-radius:var(--w3);box-shadow:3px 4px 0 var(--ink);
+  transition:transform .5s var(--spr),box-shadow .2s,background .2s}
+.btn-saran{background:var(--yel)}
+.btn-primary:active,.btn-saran:active:not(:disabled),.go:active,.gbtn-buy:active,.dlg-yes:active{transform:translate(3px,4px);box-shadow:0 0 0 var(--ink)}
+.btn-primary:disabled,.btn-saran:disabled{background:var(--s2);color:var(--mu);border-color:var(--line);box-shadow:none;border-style:dashed}
+.btn-ghost,.dlg-no{font-family:var(--brush);font-weight:400;font-size:1.15rem;background:transparent;color:var(--ink);border:2.5px dashed var(--ink);border-radius:var(--w4)}
+.btn-ghost:active,.dlg-no:active{background:var(--s2);transform:scale(.95) rotate(-1deg)}
+.btn-danger,.dlg.danger .dlg-yes{font-family:var(--brush);font-weight:400;font-size:1.15rem;color:var(--red);border:2.5px solid var(--red);border-radius:var(--w4);background:transparent}
+.dlg.danger .dlg-yes{background:var(--red);color:#1a1a22;border-color:var(--ink);box-shadow:3px 4px 0 var(--ink)}
+.btn-danger.solid{background:var(--red);color:#1a1a22}
+.go{box-shadow:4px 5px 0 var(--ink);font-size:1.4rem}
+.go:active{box-shadow:0 0 0 var(--ink)}
+.gbtn-buy.hot{background:var(--grn)}
+.lnk,.alt{font-family:var(--brush);font-weight:400;font-size:1.15rem;color:var(--ink)}
+.alt::after{height:0;border-bottom:3px dotted var(--or);background:none}
+
+/* ---------- footer ---------- */
+.bar{background:#181822;backdrop-filter:none;-webkit-backdrop-filter:none;border-top:2.5px dashed var(--ink)}
+.bar-btn{font-family:var(--hand);font-size:.82rem;color:var(--mu)}
+.bar-btn svg{stroke-width:2.2}
+.bar-btn::before{top:-10px;width:30px;height:5px;border-radius:99px;background:var(--or);box-shadow:none;border:0}
+.bar-btn.on{color:var(--or)}
+.fab{top:-30px;width:68px;height:68px;color:#1a1a22;background:var(--or);
+  border:3px solid var(--ink);border-radius:58% 42% 54% 46%/46% 56% 44% 54%;box-shadow:4px 5px 0 rgba(0,0,0,.6);
+  transition:transform .55s var(--spr),border-radius .6s var(--spr)}
+.fab:hover{border-radius:44% 56% 46% 54%/56% 44% 56% 44%}
+.fab svg{stroke-width:3}
+.fab:active{transform:scale(.88) rotate(-8deg)}
+.fab.away{transform:translateY(100px) scale(.5) rotate(40deg)}
+
+/* ---------- menu Lainnya ---------- */
+.tray{background:var(--s1);border:2.5px solid var(--ink);border-radius:var(--w1);box-shadow:5px 6px 0 rgba(0,0,0,.6);
+  transition:transform .6s var(--spr),opacity .2s}
+.tray-item{border-radius:var(--w3);transition:background .15s,opacity .3s,transform .6s var(--spr)}
+.tray-ic{border:2px solid var(--ink);border-radius:var(--w4);background:var(--yel);color:#1a1a22}
+.tray-item:nth-child(2) .tray-ic{background:var(--pink)}.tray-item:nth-child(3) .tray-ic{background:var(--blu)}
+.tray-t b{font-size:1.2rem}.tray-t small{font-family:var(--hand);font-size:.84rem}
+.tray-bg{background:rgba(8,8,14,.62)}
+
+/* ---------- lembar (sheet) & dialog ---------- */
+.sheet-panel{background:var(--s1);border:2.5px solid var(--ink);border-bottom:0;border-radius:34px 28px 0 0/28px 34px 0 0;box-shadow:0 -6px 0 rgba(0,0,0,.4);
+  transition-timing-function:var(--smooth)}
+.sheet-panel::before{content:"";display:block;width:54px;height:0;margin:0 auto 6px;border-top:4px dotted var(--line)}
+.sheet-head h2{font-size:1.6rem}
+.sheet-bg,.dlg-bg{background:rgba(8,8,14,.66);backdrop-filter:none}
+.dlg-card{background:var(--s1);border:2.5px solid var(--ink);border-radius:var(--w1);box-shadow:6px 7px 0 rgba(0,0,0,.6)}
+.dlg-card h3{font-size:1.7rem}
+.dlg-ic{border:2.5px solid var(--ink);border-radius:var(--w4);background:var(--yel);color:#1a1a22}
+.dlg.danger .dlg-ic{background:var(--red)}
+.dlg-grip{display:none}
+
+/* ---------- isian ---------- */
+.money,textarea,.plain{background:var(--s2);border:2px solid var(--ink);border-radius:var(--w3)}
+.money:focus-within,.plain:focus,textarea:focus{border-color:var(--yel);box-shadow:3px 4px 0 var(--yel)}
+.money input,.plain,textarea{font-family:var(--hand);font-size:1.1rem}
+.money em{font-family:var(--brush);font-style:normal}
+.lbl{font-family:var(--hand);color:var(--ink);font-size:.98rem}
+.err,.g-err{font-family:var(--hand);color:var(--red)}
+.meth button{font-family:var(--brush);font-size:1.1rem;font-weight:400;border:2px solid var(--ink);border-radius:var(--w3);background:var(--s2);color:var(--ink)}
+.meth button[aria-pressed="true"]{background:var(--or);color:#1a1a22;box-shadow:2px 3px 0 var(--ink)}
+.type{border:2px solid var(--ink);border-radius:var(--w3);background:var(--s2)}
+.rdot{border:2.5px solid var(--ink)}
+.radio input:checked+.rdot{background:var(--or);border-color:var(--ink)}
+
+/* ---------- landing / login (buku catatan) ---------- */
+.gate{--g-ink:#f1ecdf;--g-mu:#aeabc0;--g-line:#5a5a72;--g-paper:#1d1d28;--key:#efe9dc;background:transparent}
+.gv{background:var(--bg);background-image:radial-gradient(rgba(241,236,223,.10) 1.3px,transparent 1.6px);background-size:24px 24px}
+.g-top .logo{background:var(--or);box-shadow:2px 3px 0 rgba(0,0,0,.6)}
+.g-title{font-size:clamp(2.6rem,13vw,3.5rem)}
+.g-desc,.g-hint,.hr-day{font-family:var(--hand)}
+.hr-v b{font-family:var(--brush);font-weight:400;font-size:1.15rem}
+.sw-o,.sw-i{height:5px;border-radius:99px}
+#heroSvg .hg{stroke:var(--g-line);stroke-dasharray:3 6;stroke-linecap:round}
+#heroSvg .hl{stroke-width:3.4;filter:url(#rough)}
+#heroSvg .hd{stroke:var(--ink);stroke-width:2}
+#heroSvg .mk-line{stroke:var(--yel);stroke-dasharray:4 5;stroke-width:2}
+#heroSvg .mk-dot{stroke:var(--ink)}
+.ledger{background:var(--g-paper);border:2.5px solid var(--ink);border-radius:var(--w2);box-shadow:5px 6px 0 rgba(0,0,0,.6)}
+.ledger::before{background:var(--pink);width:2.5px}.ledger::after{background:var(--pink);width:2.5px;opacity:.35}
+.lr::after{height:2px;background:repeating-linear-gradient(90deg,var(--g-line) 0 8px,transparent 8px 13px)}
+.lr::before{height:3px;background:var(--yel);border-radius:99px}
+.lr label{font-family:var(--hand);font-size:.95rem}
+.lr input{font-family:var(--hand);font-weight:400;font-size:1.3rem}
+.lr:focus-within label{color:var(--yel)}
+.eye{color:var(--ink)}
+
+/* ---------- Target Barang ---------- */
+.gcard{background:var(--s1);border:2px solid var(--ink);border-radius:var(--w1);box-shadow:var(--pencil);transition:transform .55s var(--spr),box-shadow .2s}
+.gcard:nth-child(even){border-radius:var(--w2)}
+.gcard:active{transform:scale(.96) rotate(-.6deg)}
+.gcard.ok{border-color:var(--grn);box-shadow:3px 4px 0 rgba(94,230,168,.35)}
+.gthumb{border:2px solid var(--ink);border-radius:var(--w3);background:var(--s2)}
+.gname{font-family:var(--brush);font-weight:400;font-size:1.2rem;letter-spacing:.02em}
+.gbar{background:var(--s2);border:2px solid var(--ink);border-radius:99px;height:14px;overflow:hidden}
+.gfill{background:repeating-linear-gradient(135deg,var(--or) 0 8px,var(--or2) 8px 16px);border-radius:99px}
+.gcard.ok .gfill{background:repeating-linear-gradient(135deg,var(--grn) 0 8px,#8ff0c4 8px 16px)}
+.gd-ring .tr{stroke:var(--s2)}.gd-ring .fg{stroke:var(--or);stroke-linecap:round}.gd-ring.ok .fg{stroke:var(--grn)}
+.gd-pct{font-size:1.9rem}
+.gtog,.gph-add{border:2px dashed var(--ink);border-radius:var(--w3);background:var(--s2)}
+.gtog button[aria-pressed="true"]{color:#1a1a22}
+.gempty strong{font-size:1.5rem}
+.gdone-h{font-family:var(--brush);font-size:1.2rem;font-weight:400}
+.ge-item{border:2px dashed var(--line);border-radius:var(--w3);background:var(--s2)}
+.arm.armed{border:2.5px dashed var(--ink)}
+
+/* ---------- Analitik ---------- */
+.stc h2{font-family:var(--brush);font-weight:400;font-size:1.35rem;letter-spacing:.03em;text-transform:none;color:var(--or)}
+.stpick{background:var(--s2);border:2px solid var(--ink);border-radius:var(--w3)}
+.stpick span{font-family:var(--brush);font-weight:400;font-size:1.25rem}
+.stbig{font-size:2.2rem}
+.stbar-t{background:var(--s2);border:2px solid var(--ink);height:16px}
+.stbar-f{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.18) 0 6px,transparent 6px 12px)}
+.stbar-f.in{background-color:var(--grn)}.stbar-f.out{background-color:var(--or)}.stbar-f.mute{background-color:#6a6a80}.stbar-f.cash{background-color:var(--yel)}
+.strow,.stsub{font-family:var(--hand)}
+.strow{border-top:2px dashed var(--line)}
+.stsub{color:var(--yel);letter-spacing:.05em}
+.dn-svg circle{stroke-width:18;filter:url(#rough)}
+.dn-bg{stroke:var(--s2)}
+.dn-seg{stroke-linecap:round}
+.dn-mid b{font-family:var(--brush);font-weight:400;font-size:1.8rem}
+.dn-mid span,.dn-leg{font-family:var(--hand)}
+.dn-leg i{border:2px solid var(--ink)}
+.dn-ring{filter:drop-shadow(3px 4px 0 rgba(0,0,0,.5))}
+
+/* ---------- Chat AI ---------- */
+.chb{font-family:var(--hand);font-size:1.05rem;border:2px solid var(--ink)}
+.chb.me{background:var(--or);color:#1a1a22;border-radius:20px 18px 4px 20px/16px 20px 4px 18px;box-shadow:2px 3px 0 var(--ink);font-weight:400}
+.chb.ai{background:var(--s1);border-radius:18px 20px 20px 4px/20px 16px 18px 4px;box-shadow:var(--pencil)}
+.chb.ai h4{font-family:var(--brush);font-weight:400;font-size:1.1rem;letter-spacing:.03em;text-transform:none;color:var(--yel)}
+.chb.ai.bad{border-color:var(--red)}
+.chsug button{font-family:var(--hand);font-size:.95rem;border:2px dashed var(--ink);border-radius:var(--w4);background:var(--s1);transition:transform .5s var(--spr)}
+.chsug button:active{transform:scale(.92) rotate(-2deg);border-color:var(--yel)}
+.chform{background:var(--s1);border:2.5px solid var(--ink);border-radius:var(--w3);box-shadow:var(--pencil)}
+.chform:focus-within{border-color:var(--yel)}
+.chsend{width:42px;height:42px;border-radius:var(--w4);box-shadow:2px 3px 0 var(--ink);font-size:1rem}
+.chdock{background:linear-gradient(180deg,rgba(20,20,27,0),var(--bg) 24%)}
+
+/* ---------- Developer, saran, admin ---------- */
+.dev-card,.ac-item,.saran-body .msg{border:2px solid var(--ink);border-radius:var(--w3);background:var(--s2)}
+.saran-body h4{font-family:var(--brush);font-weight:400;font-size:1.15rem;letter-spacing:.03em;text-transform:none;color:var(--yel)}
+.dev-t strong,.ac-name b{font-family:var(--brush);font-weight:400;letter-spacing:.02em}
+.ac-tag{border:1.8px solid var(--ink);border-radius:var(--w4)}
+.version,.note{font-family:var(--hand)}
+
+.chempty strong{font-size:1.7rem;margin-bottom:6px}

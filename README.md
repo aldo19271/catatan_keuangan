@@ -56,6 +56,11 @@
 - **Analitik** per bulan: ringkasan kondisi keuangan, perbandingan pemasukan/pengeluaran dengan bulan sebelumnya, dan laporan lengkap (tunai vs non tunai, per minggu, pengeluaran terbesar).
 - Setiap catatan kini punya metode **Tunai** atau **Non Tunai** (catatan lama tetap tanpa metode). Kolom `method` ditambahkan otomatis ke tabel `tx` saat permintaan pertama.
 
+## Tema Doodle Gelap
+- Tampilan digambar tangan di atas dasar gelap: garis bergelombang, bayangan pensil, font Patrick Hand dan Caveat Brush (disimpan di folder `fonts/`, lisensi OFL).
+- `doodle.css` adalah lapisan tema yang dimuat setelah `style.css`. Warna dan bentuk ada di bagian `:root` paling atas file itu.
+- `doodle.js` berisi gerak: pegas saat tombol ditekan, catatan melompat masuk, garis grafik bergetar seperti digambar tangan, coretan yang digambar di bawah judul, dan hiasan melayang di latar.
+
 ## Pakai Cal
 1. Buka link Cal di browser HP, tekan **Selanjutnya**, lalu **Daftar** (Gmail, username, password). Berikutnya cukup **Login**; setelah itu Cal langsung terbuka sampai kamu **Logout** (Pengaturan, ikon gerigi).
 2. Menu browser → **Tambahkan ke layar utama** (Chrome Android) atau **Bagikan → Tambah ke Layar Utama** (Safari iPhone).
